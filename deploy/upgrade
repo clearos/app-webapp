@@ -1,0 +1,3 @@
+#!/bin/sh
+
+/usr/sbin/addsudo /usr/bin/unzip app-webapp-core
