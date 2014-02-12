@@ -80,25 +80,17 @@ class Webapp_Overview extends Webapp_Controller
         //---------------
 
         $this->lang->load('webapp');
-        $this->load->library('network/Hostname');
         $this->load->library($this->library);
 
         // Load the view data 
         //------------------- 
 
         try {
-            $data['info'] = $this->webapp_driver->get_info();
             $data['getting_started'] = $this->webapp_driver->get_getting_started_message();
+            $data['is_web_server_running'] = $this->webapp_driver->is_web_server_running();
             $data['home_urls'] = $this->webapp_driver->get_home_urls();
             $data['admin_urls'] = $this->webapp_driver->get_admin_urls();
-
-            $basename = 'fixme'; // FIXME
-            $internet_hostname = $this->hostname->get_internet_hostname();
-
-            // $data['hostname_url'] = $basename  . '.' . $internet_hostname;
-            // $data['directory_url'] = $internet_hostname . '/' . $basename;
-            // $data['directory'] = '/' . $basename;
-            $data['db_url'] = 'https://' . $internet_hostname . ':81/mysql';
+            $data['database_url'] = $this->webapp_driver->get_database_url();
         } catch (Exception $e) {
             $this->page->view_exception($e);
             return;

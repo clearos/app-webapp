@@ -71,15 +71,19 @@ class Webapp_Advanced extends Webapp_Controller
     /**
      * Default controller.
      *
+     * @param boolean $advanced show advanced flag
+     *
      * @return view
      */
 
     function index($advanced = FALSE)
     {
-        if ($advanced)
+        if ($advanced) {
             $this->_item('view');
-        else
+        } else {
+            $data['advanced_url'] = $this->app_name . '/advanced/edit';
             $this->page->view_form('webapp/advanced_warning', $data, lang('base_advanced_settings'));
+        }
     }
 
     /**
@@ -116,14 +120,14 @@ class Webapp_Advanced extends Webapp_Controller
         // Set validation rules
         //---------------------
 
-        $this->form_validation->set_policy('web_access', 'webapp/Webapp', 'validate_web_access', TRUE);
-        $this->form_validation->set_policy('require_authentication', 'webapp/Webapp', 'validate_web_require_authentication', TRUE);
-        $this->form_validation->set_policy('show_index', 'webapp/Webapp', 'validate_web_show_index', TRUE);
-        $this->form_validation->set_policy('follow_symlinks', 'webapp/Webapp', 'validate_web_follow_symlinks', TRUE);
-        $this->form_validation->set_policy('ssi', 'webapp/Webapp', 'validate_web_allow_ssi', TRUE);
-        $this->form_validation->set_policy('htaccess', 'webapp/Webapp', 'validate_web_htaccess_override', TRUE);
-        $this->form_validation->set_policy('php', 'webapp/Webapp', 'validate_web_php', TRUE);
-        $this->form_validation->set_policy('cgi', 'webapp/Webapp', 'validate_web_cgi', TRUE);
+        $this->form_validation->set_policy('web_access', $this->library, 'validate_accessibility', TRUE);
+        $this->form_validation->set_policy('require_authentication', $this->library, 'validate_state', TRUE);
+        $this->form_validation->set_policy('show_index', $this->library, 'validate_state', TRUE);
+        $this->form_validation->set_policy('follow_symlinks', $this->library, 'validate_state', TRUE);
+        $this->form_validation->set_policy('ssi', $this->library, 'validate_state', TRUE);
+        $this->form_validation->set_policy('htaccess', $this->library, 'validate_state', TRUE);
+        $this->form_validation->set_policy('php', $this->library, 'validate_state', TRUE);
+        $this->form_validation->set_policy('cgi', $this->library, 'validate_state', TRUE);
 
         $form_ok = $this->form_validation->run();
 
@@ -131,18 +135,18 @@ class Webapp_Advanced extends Webapp_Controller
         //-------------------
 
         if ($this->input->post('submit') && ($form_ok === TRUE)) {
-            $options['web_access'] = $this->input->post('web_access');
-            $options['require_authentication'] = $this->input->post('require_authentication');
-            $options['show_index'] = $this->input->post('show_index');
-            $options['follow_symlinks'] = $this->input->post('follow_symlinks');
-            $options['ssi'] = $this->input->post('ssi');
-            $options['htaccess'] = $this->input->post('htaccess');
-            $options['php'] = $this->input->post('php');
-            $options['cgi'] = $this->input->post('cgi');
-            $options['require_ssl'] = FALSE; // Hard code this for now
+            $settings['web_access'] = $this->input->post('web_access');
+            $settings['require_authentication'] = $this->input->post('require_authentication');
+            $settings['show_index'] = $this->input->post('show_index');
+            $settings['follow_symlinks'] = $this->input->post('follow_symlinks');
+            $settings['ssi'] = $this->input->post('ssi');
+            $settings['htaccess'] = $this->input->post('htaccess');
+            $settings['php'] = $this->input->post('php');
+            $settings['cgi'] = $this->input->post('cgi');
+            $settings['require_ssl'] = FALSE; // Hard code this for now
 
             try {
-                $this->webapp_driver->set_advanced_options($options);
+                $this->webapp_driver->set_advanced_settings($settings);
                 $this->page->set_status_updated();
                 redirect('/' . $this->app_name . '/advanced');
             } catch (Exception $e) {
@@ -158,38 +162,25 @@ class Webapp_Advanced extends Webapp_Controller
             $data['form_type'] = $form_type;
             $data['app_name'] = $this->app_name;
 
-            $data['info'] = $this->webapp_driver->get_info();
-            $data['accessibility_options'] = $this->webapp_driver->get_web_access_options();
-            $data['accessibility_default'] = $this->webapp_driver->get_web_access_default();
+            $defaults = $this->webapp_driver->get_advanced_defaults();
+            $data['options'] = $this->webapp_driver->get_advanced_options();
+            $data['settings'] = $this->webapp_driver->get_advanced_settings();
         } catch (Exception $e) {
             $this->page->view_exception($e);
             return;
         }
 
-        if (! isset($data['info']['WebAccess']))
-            $data['info']['WebAccess'] = $data['accessibility_default'];
+        // Defaults if not set
+        //--------------------
 
-        if (! isset($data['info']['WebHtaccessOverride']))
-            $data['info']['WebHtaccessOverride'] = TRUE;
-
-        if (! isset($data['info']['WebReqSsl']))
-            $data['info']['WebReqSsl'] = FALSE;
-
-        if (! isset($data['info']['WebReqAuth']))
-            $data['info']['WebReqAuth'] = FALSE;
-
-        if (! isset($data['info']['WebShowIndex']))
-            $data['info']['WebShowIndex'] = TRUE;
-
-        if (! isset($data['info']['WebPhp']))
-            $data['info']['WebPhp'] = TRUE;
-
-        if (! isset($data['info']['WebCgi']))
-            $data['info']['WebCgi'] = FALSE;
+        foreach ($defaults as $key => $value) {
+            if (!isset($data['settings'][$key]))
+                $data['settings'][$key] = $defaults[$key];
+        }
 
         // Load the views
         //---------------
 
-        $this->page->view_form('webapp/advanced', $data, lang('webapp_web_server_settings'));
+        $this->page->view_form('webapp/advanced', $data, lang('base_advanced_settings'));
     }
 }

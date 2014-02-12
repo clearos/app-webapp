@@ -4,7 +4,6 @@
  * Webapp getting started view.
  *
  * @category   apps
- * @category   apps
  * @package    webapp
  * @subpackage views
  * @author     ClearFoundation <developer@clearfoundation.com>
@@ -41,12 +40,12 @@ $this->lang->load('webapp');
 // Form
 ///////////////////////////////////////////////////////////////////////////////
 
+$options['target'] = '_blank';
+
+$anchors = anchor_custom($getting_started_url, lang('webapp_start_install_wizard'), 'high', $options) . "&nbsp; " .
+    anchor_custom($skip_url, lang('webapp_skip'));
+
 echo infobox_highlight(
     lang('webapp_initialization_complete'),
-    $getting_started . 
-    "<p align='center'>" . 
-        anchor_custom($getting_started_url, lang('webapp_start_install_wizard')) . "&nbsp; " .
-        anchor_custom($skip_url, lang('webapp_skip')) .
-    "</p>"
+    $getting_started .  "<p align='center'>$anchors</p>"
 );
-    //"<p align='center'><b><a target='_blank' style='text-decoration: underline' href='$getting_started_url'>" . lang('webapp_start_install_wizard') . "</a></b></p>"

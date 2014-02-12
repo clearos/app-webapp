@@ -4,7 +4,6 @@
  * Webapp settings view.
  *
  * @category   apps
- * @category   apps
  * @package    webapp
  * @subpackage views
  * @author     ClearFoundation <developer@clearfoundation.com>
@@ -38,24 +37,30 @@ $this->lang->load('base');
 $this->lang->load('webapp');
 
 ///////////////////////////////////////////////////////////////////////////////
+// Web server warning
+///////////////////////////////////////////////////////////////////////////////
+
+if (!$is_web_server_running)
+    echo infobox_warning(lang('base_warning'), lang('webapp_web_server_not_running'));
+
+///////////////////////////////////////////////////////////////////////////////
 // Form
 ///////////////////////////////////////////////////////////////////////////////
 
 echo form_open($app_name . '/overview');
 echo form_header(lang('base_overview'));
-// echo form_banner("hjello");
 
-// FIXME: translate
+if ($is_web_server_running) {
+    echo field_view(lang('webapp_home_page'), "<a target='_blank' href='" . $home_urls[0] . "'>" . $home_urls[0] . "</a>");
+    if (!empty($home_urls[1]))
+        echo field_view('', "<a target='_blank' href='" . $home_urls[1] . "'>" . $home_urls[1] . "</a>");
+        
+    echo field_view(lang('webapp_administrator_login'), "<a target='_blank' href='" . $admin_urls[0] . "'>" . $admin_urls[0] . "</a>");
+    if (!empty($admin_urls[1]))
+        echo field_view('', "<a target='_blank' href='" . $admin_urls[1] . "'>" . $admin_urls[1] . "</a>");
+}
 
-echo field_view('Home Page', "<a target='_blank' href='" . $home_urls[0] . "'>" . $home_urls[0] . "</a>");
-if (!empty($home_urls[1]))
-    echo field_view('', "<a target='_blank' href='" . $home_urls[1] . "'>" . $home_urls[1] . "</a>");
-    
-echo field_view('Administrator Login', "<a target='_blank' href='" . $admin_urls[0] . "'>" . $admin_urls[0] . "</a>");
-if (!empty($admin_urls[1]))
-    echo field_view('', "<a target='_blank' href='" . $admin_urls[1] . "'>" . $admin_urls[1] . "</a>");
-
-echo field_view('Database Management', "<a target='_blank' href='$db_url'>$db_url</a>");
+echo field_view(lang('webapp_database_management'), "<a target='_blank' href='$database_url'>$database_url</a>");
 
 echo form_footer();
 echo form_close();

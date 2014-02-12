@@ -4,7 +4,6 @@
  * Webapp advanced settings warning view.
  *
  * @category   apps
- * @category   apps
  * @package    webapp
  * @subpackage views
  * @author     ClearFoundation <developer@clearfoundation.com>
@@ -30,10 +29,10 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-$this->lang->load('groups');
-$this->lang->load('web_server');
+$this->lang->load('base');
+$this->lang->load('webapp');
 
 echo infobox_highlight(
     lang('base_advanced_settings'),
-    lang('webapp_advanced_settings_warning') . " &nbsp; " . anchor_custom('/fixme', lang('webapp_show_advanced_settings'))
+    lang('webapp_advanced_settings_warning') . " &nbsp; " . anchor_custom($advanced_url, lang('webapp_show_advanced_settings'))
 );

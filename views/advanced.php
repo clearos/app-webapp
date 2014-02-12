@@ -33,9 +33,8 @@
 // Load dependencies
 ///////////////////////////////////////////////////////////////////////////////
 
-$this->lang->load('base');
-$this->lang->load('groups');
-$this->lang->load('web_server');
+$this->lang->load('webapp');
+$this->lang->load('flexshare');
 
 ///////////////////////////////////////////////////////////////////////////////
 // Form handler
@@ -59,17 +58,16 @@ if ($form_type === 'edit') {
 ///////////////////////////////////////////////////////////////////////////////
 
 echo form_open($app_name . '/advanced/edit');
-// TODO: translation requires app-base > 1.5.35 echo form_header(lang('base_advanced_settings'));
-echo form_header('Advanced Settings');
+echo form_header(lang('base_advanced_settings'));
 
-echo field_dropdown('web_access', $accessibility_options, $info['WebAccess'], lang('flexshare_web_accessibility'), $read_only);
-echo field_toggle_enable_disable('require_authentication', $info['WebReqAuth'], lang('flexshare_web_require_authentication'), $read_only);
-echo field_toggle_enable_disable('show_index', $info['WebShowIndex'], lang('flexshare_web_show_index'), $read_only);
-echo field_toggle_enable_disable('follow_symlinks', $info['WebFollowSymLinks'], lang('flexshare_web_follow_symlinks'), $read_only);
-echo field_toggle_enable_disable('ssi', $info['WebAllowSSI'], lang('flexshare_web_allow_ssi'), $read_only);
-echo field_toggle_enable_disable('htaccess', $info['WebHtaccessOverride'], lang('flexshare_web_allow_htaccess'), $read_only);
-echo field_toggle_enable_disable('php', $info['WebPhp'], lang('flexshare_web_enable_php'), $read_only);
-echo field_toggle_enable_disable('cgi', $info['WebCgi'], lang('flexshare_web_enable_cgi'), $read_only);
+echo field_dropdown('web_access', $options['web_access'], $settings['web_access'], lang('flexshare_web_accessibility'), $read_only);
+echo field_toggle_enable_disable('require_authentication', $settings['require_authentication'], lang('flexshare_web_require_authentication'), $read_only);
+echo field_toggle_enable_disable('show_index', $settings['show_index'], lang('flexshare_web_show_index'), $read_only);
+echo field_toggle_enable_disable('follow_symlinks', $settings['follow_symlinks'], lang('flexshare_web_follow_symlinks'), $read_only);
+echo field_toggle_enable_disable('ssi', $settings['ssi'], lang('flexshare_web_allow_ssi'), $read_only);
+echo field_toggle_enable_disable('htaccess', $settings['htaccess'], lang('flexshare_web_allow_htaccess'), $read_only);
+echo field_toggle_enable_disable('php', $settings['php'], lang('flexshare_web_enable_php'), $read_only);
+echo field_toggle_enable_disable('cgi', $settings['cgi'], lang('flexshare_web_enable_cgi'), $read_only);
 
 echo field_button_set($buttons);
 

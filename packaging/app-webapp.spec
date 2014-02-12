@@ -3,27 +3,34 @@ Name: app-webapp
 Epoch: 1
 Version: 1.0.0
 Release: 1%{dist}
-Summary: **webapp_app_name**
+Summary: Web App Engine
 License: GPLv3
 Group: ClearOS/Apps
 Source: %{name}-%{version}.tar.gz
 Buildarch: noarch
 Requires: %{name}-core = 1:%{version}-%{release}
 Requires: app-base
+Requires: app-accounts
+Requires: app-network
+Requires: app-web-server
 
 %description
-**webapp_app_description**
+The Web App Engine provides libraries and tools for building web-based applications.
 
 %package core
-Summary: **webapp_app_name** - Core
+Summary: Web App Engine - Core
 License: LGPLv3
 Group: ClearOS/Libraries
 Requires: app-base-core
+Requires: app-base-core >= 1:1.5.24
+Requires: app-flexshare-core >= 1:1.5.30
+Requires: app-groups-core
 Requires: app-network-core
+Requires: app-web-server-core
 Requires: unzip
 
 %description core
-**webapp_app_description**
+The Web App Engine provides libraries and tools for building web-based applications.
 
 This package provides the core API and libraries.
 

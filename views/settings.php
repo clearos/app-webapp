@@ -4,7 +4,6 @@
  * Webapp settings view.
  *
  * @category   apps
- * @category   apps
  * @package    webapp
  * @subpackage views
  * @author     ClearFoundation <developer@clearfoundation.com>
@@ -35,8 +34,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 $this->lang->load('base');
-$this->lang->load('groups');
-$this->lang->load('web_server');
+$this->lang->load('webapp');
 
 ///////////////////////////////////////////////////////////////////////////////
 // Form handler
@@ -64,8 +62,8 @@ echo form_header(lang('base_settings'));
 
 echo fieldset_header(lang('webapp_hostname'));
 echo field_toggle_enable_disable('hostname_access', $hostname_access, lang('webapp_hostname_access'), $read_only);
-echo field_input('hostname', $info['WebServerName'], lang('network_hostname'), $read_only);
-echo field_input('aliases', $info['WebServerAlias'], lang('webapp_aliases'), $read_only);
+echo field_input('hostname', $hostname, lang('network_hostname'), $read_only);
+echo field_input('aliases', $aliases, lang('webapp_aliases'), $read_only);
 echo fieldset_footer();
 
 echo fieldset_header(lang('webapp_directory'));

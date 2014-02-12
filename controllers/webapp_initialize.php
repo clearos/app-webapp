@@ -76,13 +76,22 @@ class Webapp_Initialize extends Webapp_Controller
 
     function index()
     {
+        // Show account status widget if we're not in a happy state
+        //---------------------------------------------------------
+
+        $this->load->module('accounts/status');
+
+        if ($this->status->unhappy()) {
+            $this->status->widget($this->app_name);
+            return;
+        }
+
         // Load libraries
         //---------------
 
         $this->lang->load('webapp');
         $this->load->library($this->library);
         $this->load->library('network/Hostname');
-        $this->load->library('network/Domain');
 
         // Set validation rules
         //---------------------
@@ -95,7 +104,7 @@ class Webapp_Initialize extends Webapp_Controller
             $this->form_validation->set_policy('hostname', $this->library, 'validate_hostname');
 
         if ($this->input->post('directory_access'))
-            $this->form_validation->set_policy('directory', $this->library, 'validate_web_directory_alias');
+            $this->form_validation->set_policy('directory', $this->library, 'validate_directory');
 
         $form_ok = $this->form_validation->run();
 
@@ -128,7 +137,7 @@ class Webapp_Initialize extends Webapp_Controller
                 $this->webapp_driver->initialize($options);
 
                 $this->page->set_status_updated();
-//                redirect('/' . $this->app_name . '/initialize/getting_started');
+                redirect('/' . $this->app_name . '/initialize/getting_started');
             } catch (Exception $e) {
                 $this->page->view_exception($e);
                 return;
@@ -140,18 +149,15 @@ class Webapp_Initialize extends Webapp_Controller
 
         try {
             $data['app_name'] = $this->app_name;
-            $data['info'] = $this->webapp_driver->get_info();
             $data['versions'] = $this->webapp_driver->get_versions();
-
-// FIXME: pull defaults from webapp
-            $data['hostname_access'] = TRUE;
-            $data['directory_access'] = FALSE;
+            $data['hostname_access'] = $this->webapp_driver->get_hostname_access_default();
+            $data['directory_access'] = $this->webapp_driver->get_directory_access_default();
+            $data['is_web_server_running'] = $this->webapp_driver->is_web_server_running();
+            $data['hostname'] = $this->webapp_driver->get_hostname_default();
 
             $nickname = $this->webapp_driver->get_nickname();
             $internet_hostname = $this->hostname->get_internet_hostname();
-            $domain = $this->domain->get_default();
 
-            $data['hostname'] = $nickname  . '.' . $domain;
             $data['directory'] = '/' . $nickname;
             $data['directory_url'] = $internet_hostname . '/' . $nickname;
         } catch (Exception $e) {

@@ -26,8 +26,18 @@ $app['subcategory'] = 'Developer'; // e.g. lang('base_subcategory_settings');
 /////////////////////////////////////////////////////////////////////////////
 
 $app['core_requires'] = array(
+    'app-base-core >= 1:1.5.24',
+    'app-flexshare-core >= 1:1.5.30',
+    'app-groups-core',
     'app-network-core',
+    'app-web-server-core',
     'unzip',
+    'tar',
 );
 
 
+$app['requires'] = array(
+    'app-accounts',
+    'app-network',
+    'app-web-server',
+);

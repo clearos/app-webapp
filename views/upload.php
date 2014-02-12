@@ -4,7 +4,6 @@
  * Webapp upload view.
  *
  * @category   apps
- * @category   apps
  * @package    webapp
  * @subpackage views
  * @author     ClearFoundation <developer@clearfoundation.com>
@@ -34,8 +33,7 @@
 // Load dependencies
 ///////////////////////////////////////////////////////////////////////////////
 
-$this->lang->load('groups');
-$this->lang->load('web_server');
+$this->lang->load('webapp');
 
 ///////////////////////////////////////////////////////////////////////////////
 // Form handler
@@ -61,13 +59,17 @@ if ($form_type === 'edit') {
 echo form_open($app_name . '/upload/edit');
 echo form_header(lang('webapp_upload_access'));
 
-echo field_dropdown('group', $groups, $info['ShareGroup'], lang('groups_group'), $read_only);
+// Don't show group if it has not yet been defined (typically set to "nobody")
+if (($form_type == 'edit') || array_key_exists($group, $groups))
+    echo field_dropdown('group', $groups, $group, lang('webapp_group'), $read_only);
+else
+    echo field_view(lang('webapp_group'), '-');
 
 if ($ftp_available)
-    echo field_toggle_enable_disable('ftp', $info['FtpEnabled'], lang('web_server_ftp_upload'), $read_only);
+    echo field_toggle_enable_disable('ftp', $ftp_access, lang('webapp_ftp_access'), $read_only);
 
 if ($file_available)
-    echo field_toggle_enable_disable('file', $info['FileEnabled'], lang('web_server_file_server_upload'), $read_only);
+    echo field_toggle_enable_disable('file', $file_access, lang('webapp_file_server_access'), $read_only);
 
 echo field_button_set($buttons);
 

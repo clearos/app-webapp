@@ -4,7 +4,6 @@
  * Webapp settings view.
  *
  * @category   apps
- * @category   apps
  * @package    webapp
  * @subpackage views
  * @author     ClearFoundation <developer@clearfoundation.com>
@@ -36,6 +35,23 @@
 
 $this->lang->load('base');
 $this->lang->load('webapp');
+
+///////////////////////////////////////////////////////////////////////////////
+// Warnings
+///////////////////////////////////////////////////////////////////////////////
+
+if (count($versions) === 0) {
+    echo infobox_highlight(lang('base_warning'), lang('webapp_install_warning'));
+    return;
+}
+
+if (!$is_web_server_running) {
+    echo infobox_warning(
+        lang('base_warning'), 
+        lang('webapp_web_server_not_running') . '<p align="center">' . anchor_custom('/app/web_server', 'Configure Web Server') . '</p>'
+    );
+    return;
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // Infobox

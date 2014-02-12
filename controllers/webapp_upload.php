@@ -104,6 +104,20 @@ class Webapp_Upload extends Webapp_Controller
 
     function _item($form_type)
     {
+        // Skip upload widget if accounts not initialzed/happy
+        //----------------------------------------------------
+
+        $this->load->module('accounts/status');
+
+        if ($this->status->unhappy())
+            return;
+
+        // Skip if FTP and File Server not installed 
+        //------------------------------------------
+
+        if (!clearos_app_installed('ftp') && !clearos_app_installed('samba'))
+            return;
+
         // Load libraries
         //---------------
 
@@ -114,13 +128,13 @@ class Webapp_Upload extends Webapp_Controller
         // Set validation rules
         //---------------------
 
-        $this->form_validation->set_policy('group', 'webapp/Webapp', 'validate_group', TRUE);
+        $this->form_validation->set_policy('group', $this->library, 'validate_group', TRUE);
 
         if (clearos_app_installed('ftp'))
-            $this->form_validation->set_policy('ftp', 'webapp/Webapp', 'validate_ftp_state', TRUE);
+            $this->form_validation->set_policy('ftp', $this->library, 'validate_state', TRUE);
 
         if (clearos_app_installed('samba'))
-            $this->form_validation->set_policy('file', 'webapp/Webapp', 'validate_file_state', TRUE);
+            $this->form_validation->set_policy('file', $this->library, 'validate_state', TRUE);
 
         $form_ok = $this->form_validation->run();
 
@@ -128,11 +142,11 @@ class Webapp_Upload extends Webapp_Controller
         //-------------------
 
         if ($this->input->post('submit') && ($form_ok === TRUE)) {
-            $options['ftp'] = $this->input->post('ftp');
-            $options['file'] = $this->input->post('file');
+            $settings['ftp'] = $this->input->post('ftp');
+            $settings['file'] = $this->input->post('file');
 
             try {
-                $this->webapp_driver->set_upload($this->input->post('group'), $options);
+                $this->webapp_driver->set_upload_settings($this->input->post('group'), $settings);
 
                 $this->page->set_status_updated();
                 redirect('/' . $this->app_name . '/settings');
@@ -148,10 +162,12 @@ class Webapp_Upload extends Webapp_Controller
         try {
             $data['form_type'] = $form_type;
             $data['app_name'] = $this->app_name;
+
+            $data['group'] = $this->webapp_driver->get_group();
+            $data['ftp_access'] = $this->webapp_driver->get_ftp_state();
+            $data['file_access'] = $this->webapp_driver->get_file_server_state();
             $data['ftp_available'] = clearos_app_installed('ftp');
             $data['file_available'] = clearos_app_installed('samba');
-
-            $data['info'] = $this->webapp_driver->get_info();
 
             $groups = $this->group_manager->get_details();
 
