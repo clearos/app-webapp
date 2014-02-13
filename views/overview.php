@@ -60,7 +60,8 @@ if ($is_web_server_running) {
         echo field_view('', "<a target='_blank' href='" . $admin_urls[1] . "'>" . $admin_urls[1] . "</a>");
 }
 
-echo field_view(lang('webapp_database_management'), "<a target='_blank' href='$database_url'>$database_url</a>");
+if (! empty($database_url))
+    echo field_view(lang('webapp_database_management'), "<a target='_blank' href='$database_url'>" . lang('base_login') . "</a>");
 
 echo form_footer();
 echo form_close();

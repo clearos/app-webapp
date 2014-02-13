@@ -27,6 +27,8 @@ Requires: app-flexshare-core >= 1:1.5.30
 Requires: app-groups-core
 Requires: app-network-core
 Requires: app-web-server-core
+Requires: openssl
+Requires: tar
 Requires: unzip
 
 %description core

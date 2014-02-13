@@ -112,6 +112,7 @@ class Webapp_Engine extends Engine
     const PATH_LIVE = 'live';
     const COMMAND_UNZIP = '/usr/bin/unzip';
     const COMMAND_TAR = '/bin/tar';
+    const COMMAND_OPENSSL = '/usr/bin/openssl';
     const DEFAULT_HOSTNAME = 'system.lan';
     const DEFAULT_DOMAIN = 'system.lan';
 
@@ -219,7 +220,7 @@ class Webapp_Engine extends Engine
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        return 'https://' . $this->_get_ip_for_url() . ':81/mysql';
+        return '';
     }
 
     /**
@@ -831,13 +832,32 @@ class Webapp_Engine extends Engine
     ///////////////////////////////////////////////////////////////////////////
 
     /**
+     * Generates a random password.
+     *
+     * @return string random password
+     * @throws Engine_Exception
+     */
+
+    function _generate_password()
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        $shell = new Shell();
+        $shell->execute(self::COMMAND_OPENSSL, 'rand -base64 40', TRUE);
+
+        $password = $shell->get_last_output_line();
+
+        return $password;
+    }
+
+    /**
      * Returns IP used for generating URLs.
      *
      * @return string IP for URLs
      * @throws Engine_Exception
      */
 
-     function _get_ip_for_url()
+    function _get_ip_for_url()
     {
         clearos_profile(__METHOD__, __LINE__);
 

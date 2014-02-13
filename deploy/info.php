@@ -18,8 +18,9 @@ $app['description'] = lang('webapp_app_description');
 /////////////////////////////////////////////////////////////////////////////
 
 $app['name'] = lang('webapp_app_name');
-$app['category'] = lang('base_category_system');
-$app['subcategory'] = 'Developer'; // e.g. lang('base_subcategory_settings');
+$app['category'] = lang('base_category_server');
+$app['subcategory'] = lang('base_subcategory_web');
+$app['menu_enabled'] = FALSE;
 
 /////////////////////////////////////////////////////////////////////////////
 // Packaging
@@ -31,8 +32,9 @@ $app['core_requires'] = array(
     'app-groups-core',
     'app-network-core',
     'app-web-server-core',
-    'unzip',
+    'openssl',
     'tar',
+    'unzip',
 );
 
 
