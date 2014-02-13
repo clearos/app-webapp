@@ -523,10 +523,12 @@ class Webapp_Engine extends Engine
             throw new Exception('Too many release files'); // TODO: handle multiple zips?
 
         // Archive old contents
-        $target_folder = new Folder($target_path);
+        $target_folder = new Folder($target_path, TRUE);
 
         if ($target_folder->exists())
             $target_folder->move_to($archive_path);
+
+        $folder = new Folder($target_path, TRUE);
 
         $shell = new Shell();
 
@@ -534,15 +536,15 @@ class Webapp_Engine extends Engine
             $shell->execute(self::COMMAND_UNZIP, "'" . $source_path . "/" . $source_listing[0] . "' -d '$target_path'", TRUE);
         } else if (preg_match('/\.tar.gz$/', $source_listing[0])) {
 
-            $target_folder->create('root', 'root', '0755');
+            $folder->create('root', 'root', '0755');
             $shell->execute(self::COMMAND_TAR, "--strip-components=1 -C '$target_path' -xzf '" . $source_path . "/" . $source_listing[0] . "'", TRUE);
         } else {
             throw new Exception('Unsupported archive'); // TODO: translate
         }
 
-        $target_folder->chown('apache', 'apache', TRUE);
+        $folder->chown('apache', 'apache', TRUE);
 
-        $target_folder->chmod('g+rw', TRUE);
+        $folder->chmod('g+rw', TRUE);
 
         // Post-initialize hook for Webapp drivers
         //----------------------------------------
@@ -568,7 +570,7 @@ class Webapp_Engine extends Engine
         clearos_profile(__METHOD__, __LINE__);
 
         $target_path = $this->path_install . '/' . self::PATH_WEBROOT . '/' . self::PATH_LIVE . '/';
-        $target_folder = new Folder($target_path);
+        $target_folder = new Folder($target_path, TRUE);
 
         if (!$target_folder->exists())
             return FALSE;
