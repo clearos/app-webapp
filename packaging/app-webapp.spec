@@ -1,7 +1,7 @@
 
 Name: app-webapp
 Epoch: 1
-Version: 1.0.0
+Version: 1.6.0
 Release: 1%{dist}
 Summary: Web App Engine
 License: GPLv3
