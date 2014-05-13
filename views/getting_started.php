@@ -43,7 +43,7 @@ $this->lang->load('webapp');
 $options['target'] = '_blank';
 
 $anchors = anchor_custom($getting_started_url, lang('webapp_start_install_wizard'), 'high', $options) . "&nbsp; " .
-    anchor_custom($skip_url, lang('webapp_skip'));
+    anchor_custom($skip_url, lang('webapp_done'));
 
 echo infobox_highlight(
     lang('webapp_initialization_complete'),
