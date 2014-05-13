@@ -5,7 +5,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 $app['basename'] = 'webapp';
-$app['version'] = '1.6.0';
+$app['version'] = '1.6.1';
 $app['release'] = '1';
 $app['vendor'] = 'ClearFoundation';
 $app['packager'] = 'ClearFoundation';
@@ -33,6 +33,7 @@ $app['core_requires'] = array(
     'app-network-core',
     'app-web-server-core',
     'openssl',
+    'patch',
     'tar',
     'unzip',
 );
