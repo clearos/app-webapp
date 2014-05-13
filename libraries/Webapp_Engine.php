@@ -113,6 +113,7 @@ class Webapp_Engine extends Engine
     const COMMAND_UNZIP = '/usr/bin/unzip';
     const COMMAND_TAR = '/bin/tar';
     const COMMAND_OPENSSL = '/usr/bin/openssl';
+    const COMMAND_PATCH = '/usr/bin/patch';
     const DEFAULT_HOSTNAME = 'system.lan';
     const DEFAULT_DOMAIN = 'system.lan';
 
@@ -507,8 +508,8 @@ class Webapp_Engine extends Engine
         if (!empty($options['directory']))
             Validation_Exception::is_valid($this->validate_directory($options['directory']));
 
-        // Webapp unpacking
-        //-----------------
+        // Set path names
+        //---------------
 
         $filestamp = strftime("%Y-%m-%d-%H-%M-%S", time()); 
 
@@ -516,13 +517,10 @@ class Webapp_Engine extends Engine
         $unpack_path = $this->path_install . '/' . self::PATH_WEBROOT . '/';
         $target_path = $this->path_install . '/' . self::PATH_WEBROOT . '/' . self::PATH_LIVE . '/';
         $source_path = $this->path_source . '/' . self::PATH_RELEASES . '/' . $options['version'];
-        $source_folder = new Folder($source_path);
-        $source_listing = $source_folder->get_listing();
-
-        if (count($source_listing) !== 1)
-            throw new Exception('Too many release files'); // TODO: handle multiple zips?
 
         // Archive old contents
+        //---------------------
+
         $target_folder = new Folder($target_path, TRUE);
 
         if ($target_folder->exists())
@@ -530,20 +528,51 @@ class Webapp_Engine extends Engine
 
         $folder = new Folder($target_path, TRUE);
 
-        $shell = new Shell();
+        // Grab a list of archives and patches
+        //------------------------------------
 
-        if (preg_match('/\.zip$/', $source_listing[0])) {
-            $shell->execute(self::COMMAND_UNZIP, "'" . $source_path . "/" . $source_listing[0] . "' -d '$target_path'", TRUE);
-        } else if (preg_match('/\.tar.gz$/', $source_listing[0])) {
+        $archives = array();
+        $patches = array();
 
-            $folder->create('root', 'root', '0755');
-            $shell->execute(self::COMMAND_TAR, "--strip-components=1 -C '$target_path' -xzf '" . $source_path . "/" . $source_listing[0] . "'", TRUE);
-        } else {
-            throw new Exception('Unsupported archive'); // TODO: translate
+        $source_folder = new Folder($source_path);
+        $source_listing = $source_folder->get_listing();
+
+        foreach ($source_listing as $listing) {
+            if (preg_match('/\.zip$/', $listing))
+                $archives[] = $listing;
+            else if (preg_match('/\.tar.gz$/', $listing))
+                $archives[] = $listing;
+            else if (preg_match('/\.patch$/', $listing))
+                $patches[] = $listing;
         }
 
-        $folder->chown('apache', 'apache', TRUE);
+        // Unzip
+        //------
 
+        $shell = new Shell();
+
+        foreach ($archives as $archive) {
+            if (preg_match('/\.zip$/', $archive)) {
+                $shell->execute(self::COMMAND_UNZIP, "'" . $source_path . "/" . $archive . "' -d '$target_path'", TRUE);
+            } else if (preg_match('/\.tar.gz$/', $archive)) {
+
+                $folder->create('root', 'root', '0755');
+                $shell->execute(self::COMMAND_TAR, "--strip-components=1 -C '$target_path' -xzf '" . $source_path . "/" . $archive . "'", TRUE);
+            }
+        }
+
+        // Patch
+        //------
+
+        $shell = new Shell();
+
+        foreach ($patches as $patch)
+            $shell->execute(self::COMMAND_PATCH, "-p1 -d '$target_path' -i '" . $source_path . "/" . $patch . "'", TRUE);
+
+        // Clean up permissions
+        //---------------------
+
+        $folder->chown('apache', 'apache', TRUE);
         $folder->chmod('g+rw', TRUE);
 
         // Post-initialize hook for Webapp drivers
