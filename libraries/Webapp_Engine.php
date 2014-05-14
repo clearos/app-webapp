@@ -569,17 +569,17 @@ class Webapp_Engine extends Engine
         foreach ($patches as $patch)
             $shell->execute(self::COMMAND_PATCH, "-p1 -d '$target_path' -i '" . $source_path . "/" . $patch . "'", TRUE);
 
-        // Clean up permissions
-        //---------------------
-
-        $folder->chown('apache', 'apache', TRUE);
-        $folder->chmod('g+rw', TRUE);
-
         // Post-initialize hook for Webapp drivers
         //----------------------------------------
 
         if (method_exists($this, '_post_unpacking_hook'))
             $this->_post_unpacking_hook();
+
+        // Clean up permissions
+        //---------------------
+
+        $folder->chown('apache', 'apache', TRUE);
+        $folder->chmod('g+rw', TRUE);
 
         // Flexshare hook
         //----------------

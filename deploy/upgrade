@@ -1,3 +1,4 @@
 #!/bin/sh
 
 /usr/sbin/addsudo /usr/bin/unzip app-webapp-core
+/usr/sbin/addsudo /usr/bin/patch app-webapp-core
