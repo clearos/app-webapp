@@ -5,7 +5,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 $app['basename'] = 'webapp';
-$app['version'] = '1.6.5';
+$app['version'] = '2.4.0';
 $app['release'] = '1';
 $app['vendor'] = 'ClearFoundation';
 $app['packager'] = 'ClearFoundation';
@@ -28,19 +28,18 @@ $app['menu_enabled'] = FALSE;
 
 $app['core_requires'] = array(
     'app-base-core >= 1:1.5.24',
+    'app-certificate-manager-core',
     'app-flexshare-core >= 1:1.5.30',
     'app-groups-core',
     'app-network-core',
     'app-web-server-core',
+    'app-mariadb-core',
     'openssl',
-    'patch',
-    'tar',
-    'unzip',
 );
-
 
 $app['requires'] = array(
     'app-accounts',
     'app-network',
     'app-web-server',
+    'app-mariadb',
 );
