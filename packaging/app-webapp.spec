@@ -1,7 +1,7 @@
 
 Name: app-webapp
 Epoch: 1
-Version: 1.6.5
+Version: 2.4.0
 Release: 1%{dist}
 Summary: Web App Engine
 License: GPLv3
@@ -13,6 +13,7 @@ Requires: app-base
 Requires: app-accounts
 Requires: app-network
 Requires: app-web-server
+Requires: app-mariadb
 
 %description
 The Web App Engine provides libraries and tools for building web-based applications.
@@ -23,14 +24,13 @@ License: LGPLv3
 Group: ClearOS/Libraries
 Requires: app-base-core
 Requires: app-base-core >= 1:1.5.24
+Requires: app-certificate-manager-core
 Requires: app-flexshare-core >= 1:1.5.30
 Requires: app-groups-core
 Requires: app-network-core
 Requires: app-web-server-core
+Requires: app-mariadb-core
 Requires: openssl
-Requires: patch
-Requires: tar
-Requires: unzip
 
 %description core
 The Web App Engine provides libraries and tools for building web-based applications.
@@ -82,6 +82,7 @@ exit 0
 %files core
 %defattr(-,root,root)
 %exclude /usr/clearos/apps/webapp/packaging
+%exclude /usr/clearos/apps/webapp/unify.json
 %dir /usr/clearos/apps/webapp
 /usr/clearos/apps/webapp/deploy
 /usr/clearos/apps/webapp/language

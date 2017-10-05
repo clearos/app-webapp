@@ -57,29 +57,22 @@ clearos_load_language('webapp');
 //--------
 
 use \clearos\apps\base\Engine as Engine;
-use \clearos\apps\base\Folder as Folder;
 use \clearos\apps\base\Shell as Shell;
-use \clearos\apps\flexshare\Flexshare as Flexshare;
-use \clearos\apps\groups\Group_Factory as Group_Factory;
-use \clearos\apps\network\Domain as Domain;
-use \clearos\apps\network\Iface_Manager as Iface_Manager;
+use \clearos\apps\groups\Group_Manager_Factory as Group_Manager_Factory;
 use \clearos\apps\web_server\Httpd as Httpd;
 
 clearos_load_library('base/Engine');
-clearos_load_library('base/Folder');
 clearos_load_library('base/Shell');
-clearos_load_library('flexshare/Flexshare');
-clearos_load_library('groups/Group_Factory');
-clearos_load_library('network/Domain');
-clearos_load_library('network/Iface_Manager');
+clearos_load_library('groups/Group_Manager_Factory');
 clearos_load_library('web_server/Httpd');
 
 // Exceptions
 //-----------
 
-use \Exception as Exception;
+use \clearos\apps\base\Engine_Exception as Engine_Exception;
 use \clearos\apps\base\Validation_Exception as Validation_Exception;
 
+clearos_load_library('base/Engine_Exception');
 clearos_load_library('base/Validation_Exception');
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -121,10 +114,9 @@ class Webapp_Site_Engine extends Engine
     // V A R I A B L E S
     ///////////////////////////////////////////////////////////////////////////////
 
-    protected $webapp = NULL;
-    protected $path_source = NULL;
-    protected $path_install = NULL;
     protected $config = array();
+    protected $site = NULL;
+    protected $webapp = NULL;
 
     ///////////////////////////////////////////////////////////////////////////////
     // M E T H O D S
@@ -134,164 +126,31 @@ class Webapp_Site_Engine extends Engine
      * Webapp constructor.
      *
      * @param string $webapp webapp basename
+     * @param string $site   site name
      */
 
-    function __construct($webapp, $site)
+    public function __construct($webapp, $site)
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        $this->flexshare = 'webapp-' . $webapp . '-' . $site;
-        $this->path_source = self::PATH_SOURCE . '/webapp-' . $webapp;
-        $this->path_install = self::PATH_INSTALL . '/' . $webapp;
+        $this->webapp = $webapp;
+        $this->site = $site;
     }
 
     /**
-     * Returns default configuration information for the webapp.
+     * Returns state of file access.
      *
-     * @return array default settings for the webap
-     */
-
-    function get_advanced_defaults()
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        $settings['web_access'] = Flexshare::ACCESS_ALL;
-        $settings['require_authentication'] = FALSE;
-        $settings['show_index'] = TRUE;
-        $settings['follow_symlinks'] = FALSE;
-        $settings['ssi'] = FALSE;
-        $settings['htaccess'] = TRUE;
-        $settings['php'] = TRUE;
-        $settings['cgi'] = FALSE;
-
-        return $settings;
-    }
-
-    /**
-     * Returns a list of options for advanced settings.
-     *
-     * @return array advanced options
+     * @return boolean TRUE if FTP access is enabled
      * @throws Engine_Exception
      */
 
-    function get_advanced_options()
+    public function get_file_state()
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        $flexshare = new Flexshare();
+        $httpd = new Httpd();
 
-        $options['web_access'] = $flexshare->get_web_access_options();
-
-        return $options;
-    }
-
-    /**
-     * Returns advanced configuration.
-     *
-     * @return array settings for the webap
-     * @throws Engine_Exception
-     */
-
-    function get_advanced_settings()
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        $this->_load_config();
-
-        $settings['web_access'] = $this->config['WebAccess'];
-        $settings['require_authentication'] = $this->config['WebReqAuth'];
-        $settings['show_index'] = $this->config['WebShowIndex'];
-        $settings['follow_symlinks'] = $this->config['WebFollowSymLinks'];
-        $settings['ssi'] = $this->config['WebAllowSSI'];
-        $settings['htaccess'] = $this->config['WebHtaccessOverride'];
-        $settings['php'] = $this->config['WebPhp'];
-        $settings['cgi'] = $this->config['WebCgi'];
-
-        return $settings;
-    }
-
-    /**
-     * Returns database admin URL.
-     *
-     * @return string database admin URL
-     * @throws Engine_Exception
-     */
-
-    function get_database_url()
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        return '';
-    }
-
-    /**
-     * Returns directory name.
-     *
-     * @return string directory name for web alias
-     * @throws Engine_Exception
-     */
-
-    function get_directory()
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        $this->_load_config();
-
-        $retval = (empty($this->config['WebDirectoryAlias'])) ? '' : $this->config['WebDirectoryAlias'];
-
-        return $retval;
-    }
-
-    /**
-     * Returns directory access.
-     *
-     * @return boolean TRUE if directory access is enabled
-     * @throws Engine_Exception
-     */
-
-    function get_directory_access()
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        $this->_load_config();
-
-        $retval = (empty($this->config['WebDirectoryAlias'])) ? FALSE : TRUE;
-
-        return $retval;
-    }
-
-    /**
-     * Returns directory access default.
-     *
-     * Webapps are expected to override this if desired.
-     *
-     * @return boolean TRUE if directory access default desired
-     * @throws Engine_Exception
-     */
-
-    function get_directory_access_default()
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        return TRUE;
-    }
-
-    /**
-     * Returns state of file server access.
-     *
-     * @return boolean TRUE if file server access is enabled
-     * @throws Engine_Exception
-     */
-
-    function get_file_server_state()
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        $this->_load_config();
-
-        $retval = (empty($this->config['FileEnabled'])) ? FALSE : TRUE;
-
-        return $retval;
+        return $httpd->get_file_state($this->site);
     }
 
     /**
@@ -301,15 +160,13 @@ class Webapp_Site_Engine extends Engine
      * @throws Engine_Exception
      */
 
-    function get_ftp_state()
+    public function get_ftp_state()
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        $this->_load_config();
+        $httpd = new Httpd();
 
-        $retval = (empty($this->config['FtpEnabled'])) ? FALSE : TRUE;
-
-        return $retval;
+        return $httpd->get_ftp_state($this->site);
     }
 
     /**
@@ -319,466 +176,109 @@ class Webapp_Site_Engine extends Engine
      * @throws Engine_Exception
      */
 
-    function get_group()
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        $this->_load_config();
-
-        $retval = (empty($this->config['ShareGroup'])) ? '' : $this->config['ShareGroup'];
-
-        return $retval;
-    }
-
-    /**
-     * Returns home URLs.
-     *
-     * @return array list of home URLs
-     * @throws Engine_Exception
-     */
-
-    function get_home_urls()
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        $this->_load_config();
-
-        $urls = array();
-
-        if (!empty($this->config['WebServerName']))
-            $urls[] = 'http://' . $this->config['WebServerName'];
-
-        if (!empty($this->config['WebDirectoryAlias']))
-            $urls[] = 'http://' . $this->_get_ip_for_url() . $this->config['WebDirectoryAlias'];
-
-        return $urls;
-    }
-
-    /**
-     * Returns hostname.
-     *
-     * @return string virtual host hostname
-     * @throws Engine_Exception
-     */
-
-    function get_hostname()
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        $this->_load_config();
-
-        $retval = (empty($this->config['WebServerName'])) ? '' : $this->config['WebServerName'];
-
-        return $retval;
-    }
-
-    /**
-     * Returns hostname access.
-     *
-     * @return boolean TRUE if hostname access is enabled
-     * @throws Engine_Exception
-     */
-
-    function get_hostname_access()
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        $this->_load_config();
-
-        $retval = (empty($this->config['WebServerName'])) ? FALSE : TRUE;
-
-        return $retval;
-    }
-
-    /**
-     * Returns hostname access default.
-     *
-     * @return boolean TRUE if hostname access default desired
-     * @throws Engine_Exception
-     */
-
-    function get_hostname_access_default()
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        return TRUE;
-    }
-
-    /**
-     * Returns hostname aliases.
-     *
-     * @return string virtual host hostname aliases
-     * @throws Engine_Exception
-     */
-
-    function get_hostname_aliases()
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        $this->_load_config();
-
-        $retval = (empty($this->config['WebServerAlias'])) ? '' : $this->config['WebServerAlias'];
-
-        return $retval;
-    }
-
-    /**
-     * Returns hostname default..
-     *
-     * @return string virtual host default hostname
-     * @throws Engine_Exception
-     */
-
-    function get_hostname_default()
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        $domain = new Domain();
-
-        $nickname = $this->get_nickname();
-        $domain = $domain->get_default();
-
-        if (empty($domain))
-            $domain = self::DEFAULT_DOMAIN;
-
-        return $nickname  . '.' . $domain;
-    }
-
-    /**
-     * Returns the available versions.
-     *
-     * @return array list of available versions
-     * @throws Engine_Exception
-     */
-
-    function get_versions()
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        $listing = array();
-        try {
-            $folder = new Folder($this->path_source . '/' . self::PATH_RELEASES);
-            $listing = $folder->get_listing();
-        } catch(Exception $e) {
-            // Not fatal
-        }
-
-        rsort($listing);
-
-        return $listing;
-    }
-
-    /**
-     * Returns state of web server.
-     *
-     * @return boolean state of web server
-     * @throws Engine_Exception
-     */
-
-    function is_web_server_running()
+    public function get_group()
     {
         clearos_profile(__METHOD__, __LINE__);
 
         $httpd = new Httpd();
 
-        return $httpd->get_running_state();
+        return $httpd->get_group($this->site);
     }
 
     /**
-     * Initializes a webapp.
+     * Returns list of available groups.
      *
-     * @param array $options web server options
-     *
-     * @return void
+     * @return array list of available groups
      * @throws Engine_Exception
      */
 
-    function initialize($options)
+    public function get_group_options()
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        // Validation
-        //-----------
+        $group_manager = Group_Manager_Factory::create();
 
-        Validation_Exception::is_valid($this->validate_version($options['version']));
+        $raw_groups = $group_manager->get_details();
+        $groups = [];
 
-        if (!empty($options['hostname']))
-            Validation_Exception::is_valid($this->validate_hostname($options['hostname']));
+        foreach ($raw_groups as $group => $details)
+            $groups[$group] = $group . ' - ' . $details['core']['description'];
 
-        if (!empty($options['directory']))
-            Validation_Exception::is_valid($this->validate_directory($options['directory']));
-
-        // Set path names
-        //---------------
-
-        $filestamp = strftime("%Y-%m-%d-%H-%M-%S", time()); 
-
-        $archive_path = $this->path_install . '/' . self::PATH_ARCHIVE . '/' . $filestamp;
-        $unpack_path = $this->path_install . '/' . self::PATH_WEBROOT . '/';
-        $target_path = $this->path_install . '/' . self::PATH_WEBROOT . '/' . self::PATH_LIVE . '/';
-        $source_path = $this->path_source . '/' . self::PATH_RELEASES . '/' . $options['version'];
-
-        // Archive old contents
-        //---------------------
-
-        $target_folder = new Folder($target_path, TRUE);
-
-        if ($target_folder->exists())
-            $target_folder->move_to($archive_path);
-
-        $folder = new Folder($target_path, TRUE);
-
-        // Grab a list of archives and patches
-        //------------------------------------
-
-        $archives = array();
-        $patches = array();
-
-        $source_folder = new Folder($source_path);
-        $source_listing = $source_folder->get_listing();
-
-        foreach ($source_listing as $listing) {
-            if (preg_match('/\.zip$/', $listing))
-                $archives[] = $listing;
-            else if (preg_match('/\.tar.gz$/', $listing))
-                $archives[] = $listing;
-            else if (preg_match('/\.patch$/', $listing))
-                $patches[] = $listing;
-        }
-
-        // Unzip
-        //------
-
-        $shell = new Shell();
-
-        foreach ($archives as $archive) {
-            if (preg_match('/\.zip$/', $archive)) {
-                $shell->execute(self::COMMAND_UNZIP, "'" . $source_path . "/" . $archive . "' -d '$target_path'", TRUE);
-            } else if (preg_match('/\.tar.gz$/', $archive)) {
-
-                $folder->create('root', 'root', '0755');
-                $shell->execute(self::COMMAND_TAR, "--strip-components=1 -C '$target_path' -xzf '" . $source_path . "/" . $archive . "'", TRUE);
-            }
-        }
-
-        // Patch
-        //------
-
-        $shell = new Shell();
-
-        foreach ($patches as $patch)
-            $shell->execute(self::COMMAND_PATCH, "-p1 -d '$target_path' -i '" . $source_path . "/" . $patch . "'", TRUE);
-
-        // Post-initialize hook for Webapp drivers
-        //----------------------------------------
-
-        if (method_exists($this, '_post_unpacking_hook'))
-            $this->_post_unpacking_hook();
-
-        // Clean up permissions
-        //---------------------
-
-        $folder->chown('apache', 'apache', TRUE);
-        $folder->chmod('g+rw', TRUE);
-
-        // Flexshare hook
-        //----------------
-
-        $this->set_core_settings($options);
+        return $groups;
     }
 
     /**
-     * Returns state of initialization.
+     * Returns configured SSL certificate.
      *
-     * @return boolean TRUE if initialized
+     * @return string SSL certificate name
      * @throws Engine_Exception
      */
 
-    function is_initialized()
+    public function get_ssl_certificate()
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        $target_path = $this->path_install . '/' . self::PATH_WEBROOT . '/' . self::PATH_LIVE . '/';
-        $target_folder = new Folder($target_path, TRUE);
+        $httpd = new Httpd();
 
-        if (!$target_folder->exists())
-            return FALSE;
+        return $httpd->get_ssl_certificate($this->site);
 
-        $listing = $target_folder->get_listing();
-
-        if (count($listing) === 0)
-            return FALSE;
-        else
-            return TRUE;
     }
 
     /**
-     * Sets advanced settings.
+     * Returns a list of valid web certificates for site.
      *
-     * @param array $settings web server settings
+     * @return string array list of available certificates
+     * @throws Engine_Exception
+     */
+
+    public function get_ssl_certificate_options()
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        $httpd = new Httpd();
+
+        return $httpd->get_ssl_certificate_options();
+    }
+
+    /**
+     * Updates parameters for a site.
+     *
+     * @param string $aliases     aliases
+     * @param string $group       group owner
+     * @param string $ftp_state   FTP enabled state
+     * @param string $file_state  file enabled state
+     * @param string $certificate SSL certificate
      *
      * @return  void
      * @throws  Engine_Exception
      */
 
-    function set_advanced_settings($settings)
+    public function update($aliases, $group, $ftp_state, $file_state, $certificate)
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        Validation_Exception::is_valid($this->validate_hostname($this->flexshare));
 
-        $flexshare = new Flexshare();
-
-        // Web and Options
-        if (isset($settings['web_access']))
-            $flexshare->set_web_access($this->flexshare, $settings['web_access']);
-
-        if (isset($settings['require_authentication']))
-            $flexshare->set_web_require_authentication($this->flexshare, $settings['require_authentication']);
-
-        if (isset($settings['require_ssl']))
-            $flexshare->set_web_require_ssl($this->flexshare, $settings['require_ssl']);
-
-        if (isset($settings['show_index']))
-            $flexshare->set_web_show_index($this->flexshare, $settings['show_index']);
-
-        if (isset($settings['follow_symlinks']))
-            $flexshare->set_web_follow_symlinks($this->flexshare, $settings['follow_symlinks']);
-
-        if (isset($settings['ssi']))
-            $flexshare->set_web_allow_ssi($this->flexshare, $settings['ssi']);
-
-        if (isset($settings['htaccess']))
-            $flexshare->set_web_htaccess_override($this->flexshare, $settings['htaccess']);
-
-        if (isset($settings['php']))
-            $flexshare->set_web_php($this->flexshare, $settings['php']);
-
-        if (isset($settings['cgi']))
-            $flexshare->set_web_cgi($this->flexshare, $settings['cgi']);
-
-        // Globals
-        $flexshare->set_share_state($this->flexshare, TRUE);
-        $flexshare->update_share($this->flexshare, TRUE);
-    }
-
-    /**
-     * Sets core settings.
-     *
-     * @param array $settings access settings
-     *
-     * @return void
-     * @throws Engine_Exception
-     */
-
-    function set_core_settings($settings)
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        // Validation
-        //-----------
-
-        if (!empty($settings['hostname']))
-            Validation_Exception::is_valid($this->validate_hostname($settings['hostname']));
-
-        if (!empty($settings['aliases']))
-            Validation_Exception::is_valid($this->validate_aliases($settings['aliases']));
-
-        if (!empty($settings['directory']))
-            Validation_Exception::is_valid($this->validate_directory($settings['directory']));
-
-        // Flexshare settings
-        //-------------------
-        
-        // Prepend directory with slash if one does not exist
-        if (!empty( $settings['directory']) && !preg_match('/^\//', $settings['directory']))
-            $settings['directory'] = '/' . $settings['directory'];
-
-        $flexshare = new Flexshare();
-
-        $flexshare->set_web_server_name($this->flexshare, $settings['hostname']);
-        $flexshare->set_web_server_alias($this->flexshare, $settings['aliases']);
-        $flexshare->set_web_directory_alias($this->flexshare, $settings['directory']);
-
-        $flexshare->update_share($this->flexshare, TRUE);
-    }
-
-    /**
-     * Sets upload settings for a webapp.
-     *
-     * @param string $group    group name
-     * @param array  $settings upload settings
-     *
-     * @return  void
-     * @throws  Engine_Exception
-     */
-
-    function set_upload_settings($group, $settings)
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
+        Validation_Exception::is_valid($this->validate_aliases($aliases));
         Validation_Exception::is_valid($this->validate_group($group));
-        Validation_Exception::is_valid($this->validate_state($settings['ftp']));
-        Validation_Exception::is_valid($this->validate_state($settings['file']));
-
-        if ($settings['ftp'] && !clearos_library_installed('ftp/ProFTPd'))
-            throw new Validation_Exception(lang('webapp_ftp_access_not_available'));
-
-        if ($settings['file'] && !clearos_library_installed('samba_common/Samba'))
-            throw new Validation_Exception(lang('webapp_file_server_access_not_available'));
-
-        $flexshare = new Flexshare();
-
-        $flexshare->set_group($this->flexshare, $group);
-        $flexshare->set_ftp_enabled($this->flexshare, $settings['ftp']);
-        $flexshare->set_file_enabled($this->flexshare, $settings['file']);
-
-        $flexshare->update_share($this->flexshare, TRUE);
-    }
-
-    /**
-     * List of sites.
-     *
-     * @return array $list of all sites for given webapp
-     */
-
-    function get_sites()
-    {
-        clearos_profile(__METHOD__, __LINE__);
+        Validation_Exception::is_valid($this->validate_ftp_state($ftp_state));
+        Validation_Exception::is_valid($this->validate_file_state($file_state));
+        Validation_Exception::is_valid($this->validate_ssl_certificate($certificate));
 
         $httpd = new Httpd();
-        $webapps = $httpd->get_webapps();
 
-        $list = array();
-
-        foreach ($webapps as $key => $value) {
-            $list[$key]['name'] = $key;
-            // $list[$key]['database'] = $this->get_database_name($key);
-        }
-
-        return $list;
+        $httpd->set_webapp(
+            $this->site,
+            $aliases,
+            $group,
+            $ftp_state,
+            $file_state,
+            $certificate
+        );
     }
 
     ///////////////////////////////////////////////////////////////////////////
     // V A L I D A T I O N   R O U T I N E S                                 //
     ///////////////////////////////////////////////////////////////////////////
-
-    /**
-     * Validation routine for web access.
-     *
-     * @param boolean $accessibility web access
-     *
-     * @return string error message if web access is invalid
-     */
-
-    function validate_accessibility($accessibility)
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        $flexshare = new Flexshare();
-
-        return $flexshare->validate_web_access($accessibility);
-    }
 
     /**
      * Validation routine for aliases.
@@ -788,31 +288,146 @@ class Webapp_Site_Engine extends Engine
      * @return error message if aliases is invalid
      */
 
-    function validate_aliases($aliases)
+    public function validate_aliases($aliases)
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        if ($aliases && (!preg_match("/^([0-9a-zA-Z\.\-_ ,\*]+)$/", $aliases)))
-            return lang('webapp_aliases_invalid');
+        $httpd = new Httpd();
+
+        return $httpd->validate_aliases($aliases);
     }
 
     /**
-     * Validation routine for directory.
+     * Validate admin username.
      *
-     * @param string $directory directory
+     * @param string $username Username
      *
-     * @return string error message if directory is invalid
+     * @return string error message if exists
      */
 
-    function validate_directory($directory)
+    public function validate_database_admin_username($username)
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        // Trim any leading slashes
-        $directory = preg_replace('/^\//', '', $directory);
+        if (! preg_match('/^([a-z0-9_\-\.\$]+)$/', $username))
+            return lang('base_username_invalid');
+    }
 
-        if (!preg_match('/^[\w\/-]+$/', $directory))
-            return lang('webapp_directory_invalid');
+    /**
+     * Validate database admin password.
+     *
+     * @param string $password Password
+     *
+     * @return string error message if exists
+     */
+
+    public function validate_database_admin_password($password)
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        if (! preg_match('/.*\S.*/', $password))
+            return lang('base_password_is_invalid');
+    }
+
+    /**
+     * Validate database password.
+     *
+     * @param string $password Password
+     *
+     * @return string error message if exists
+     */
+
+    public function validate_database_password($password)
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        if (! preg_match('/.*\S.*/', $password))
+            return lang('base_password_is_invalid');
+    }
+
+    /**
+     * Validate database username.
+     *
+     * @param string $username Username
+     *
+     * @return string error message if exists
+     */
+
+    public function validate_database_username($username)
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        if (! preg_match('/^([a-z0-9_\-\.\$]+)$/', $username))
+            return lang('base_username_invalid');
+    }
+
+    /**
+     * Validate if database is exisitng.
+     *
+     * @param string $database_name Database Name
+     *
+     * @return string error message if database name is not exists
+     */
+
+    public function validate_existing_database($database_name)
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        // FIXME: SQL inject vulnerability, no _POST allowed in API calls.
+        $admin_username = $_POST['database_admin_username'];
+        $admin_password = $_POST['database_admin_password'];
+        $command = "mysql -u $admin_username -p$admin_password -e \"SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '$database_name'\"";
+        $shell = new Shell();
+
+        try {
+            $retval = $shell->execute(
+                self::COMMAND_MYSQL, $command, FALSE, $options
+            );
+        } catch (Engine_Exception $e) {
+            return $e->get_message();
+        }
+
+        $output = $shell->get_output();
+        $output_message = strtolower($output);
+
+        if (strpos($output_message, 'error') !== FALSE)
+            return lang('webapp_unable_connect_via_admin_user');
+        else if(!$output)
+            return lang('webapp_database_does_not_exist');
+    }
+
+    /**
+     * Validation routine for file server state.
+     *
+     * @param boolean $state state
+     *
+     * @return error message if file server state is invalid
+     */
+
+    public function validate_file_state($state)
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        $httpd = new Httpd();
+
+        return $httpd->validate_file_state($state);
+    }
+
+    /**
+     * Validation routine for FTP state.
+     *
+     * @param boolean $state state
+     *
+     * @return error message if FTP state is invalid
+     */
+
+    public function validate_ftp_state($state)
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        $httpd = new Httpd();
+
+        return $httpd->validate_ftp_state($state);
     }
 
     /**
@@ -823,46 +438,80 @@ class Webapp_Site_Engine extends Engine
      * @return error message if group is invalid
      */
 
-    function validate_group($group_name)
+    public function validate_group($group_name)
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        $group = Group_Factory::create($group_name);
+        $httpd = new Httpd();
 
-        if (! $group->exists())
-            return lang('groups_group_name_invalid');
+        return $httpd->validate_group($group_name);
     }
 
     /**
-     * Validation routine for hostname
+     * Validate if database is new.
      *
-     * @param string $hostname hostname
+     * @param string $database_name Database Name
      *
-     * @return string error message if hostname is invalid
+     * @return string error message if Database name is exists
      */
 
-    function validate_hostname($hostname)
+    public function validate_new_database($database_name)
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        if (!preg_match("/^[A-Za-z0-9\.\-_]+$/", $hostname))
-            return lang('network_hostname_invalid');
+        // FIXME: SQL inject vulnerability, no _POST allowed in API calls.
+        $admin_username = $_POST['database_admin_username'];
+        $admin_password = $_POST['database_admin_password'];
+        $command = "mysql -u $admin_username -p$admin_password -e \"SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '$database_name'\"";
+        $shell = new Shell();
+
+        try {
+            $retval = $shell->execute(self::COMMAND_MYSQL, $command, FALSE, $options);
+        } catch (Engine_Exception $e) {
+            return $e->get_message();
+        }
+
+        $output = $shell->get_output();
+        $output_message = strtolower($output);
+
+        if (strpos($output_message, 'error') !== FALSE)
+            return lang('webapp_unable_connect_via_admin_user');
+        else if($output)
+            return lang('webapp_database_already_exists');
     }
 
     /**
-     * Validation routine for state.
+     * Validation routine for site.
      *
-     * @param boolean $state state
+     * @param string $site site
      *
-     * @return error message if state is invalid
+     * @return string error message if site is invalid
      */
 
-    function validate_state($state)
+    public function validate_site($site)
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        if (!clearos_is_valid_boolean($state))
-            return lang('base_parameter_invalid');
+        $httpd = new Httpd();
+
+        return $httpd->validate_site($site);
+    }
+
+    /**
+     * Validation routine for SSL certificate.
+     *
+     * @param string $certificate certificate name
+     *
+     * @return string error message if certificate is invalid
+     */
+
+    public function validate_ssl_certificate($certificate)
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        $httpd = new Httpd();
+
+        return $httpd->validate_ssl_certificate($certificate);
     }
 
     /**
@@ -873,74 +522,12 @@ class Webapp_Site_Engine extends Engine
      * @return error message if version is invalid
      */
 
-    function validate_version($version)
+    public function validate_version($version)
     {
         clearos_profile(__METHOD__, __LINE__);
 
         if (! in_array($version, $this->get_versions()))
             return lang('webapp_version_invalid');
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-    // P R I V A T E  M E T H O D S                                          //
-    ///////////////////////////////////////////////////////////////////////////
-
-    /**
-     * Generates a random password.
-     *
-     * @return string random password
-     * @throws Engine_Exception
-     */
-
-    function _generate_password()
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        $shell = new Shell();
-        $shell->execute(self::COMMAND_OPENSSL, 'rand -base64 40', TRUE);
-
-        $password = $shell->get_last_output_line();
-
-        return $password;
-    }
-
-    /**
-     * Returns IP used for generating URLs.
-     *
-     * @return string IP for URLs
-     * @throws Engine_Exception
-     */
-
-    function _get_ip_for_url()
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        // If interactive, use IP from client.  Fall back to LAN IP.
-        if (empty($_SERVER['HTTP_HOST'])) {
-            $iface_manager = new Iface_Manager();
-            $ips = $iface_manager->get_most_trusted_ips();
-            $ip = $ips[0];
-        } else {
-            $ip = preg_replace('/:.*/', '', $_SERVER['HTTP_HOST']);
-        }
-
-        return $ip;
-    }
-
-    /**
-     * Loads configuraion.
-     *
-     * @return void
-     */
-
-    protected function _load_config()
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        if (empty($this->config)) {
-            $flexshare = new Flexshare();
-            $this->config = $flexshare->get_share($this->flexshare);
-        }
     }
 }
 

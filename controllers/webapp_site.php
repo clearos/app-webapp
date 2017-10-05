@@ -53,7 +53,7 @@ use \Exception as Exception;
 
 class Webapp_Site extends ClearOS_Controller
 {
-    protected $library = NULL;
+    protected $driver = NULL;
     protected $app_basename = NULL;
 
     /**
@@ -70,8 +70,8 @@ class Webapp_Site extends ClearOS_Controller
 
         $this->app_basename = $app_basename;
         $this->app_description = $app_description;
-        $this->library = $app_basename . '/Webapp_Driver';
-        $this->site_library = $app_basename . '/Webapp_Site_Driver';
+        $this->site_driver = $app_basename . '/Webapp_Site_Driver';
+        $this->driver = $app_basename . '/Webapp_Driver';
     }
 
     /**
@@ -86,33 +86,15 @@ class Webapp_Site extends ClearOS_Controller
         //------------------
 
         $this->lang->load($this->app_basename);
-        $this->load->library($this->library);
-
-/*
-
-            $web_server_running_status = $this->joomla->get_web_server_running_status();
-            $mariadb_running_status = $this->joomla->get_mariadb_running_status();
-            $mariadb_password_status = $this->joomla->get_mariadb_root_password_set_status();
-            $joomla_version_not_downloaded = $this->joomla->get_versions(TRUE);
-FIXME
-
-        if (($web_server_running_status == 'stopped') ||
-            ($mariadb_running_status != 'running')||
-            !$mariadb_password_status ||
-            !$joomla_version_not_downloaded) {
-            $views = array('joomla/dependencies', 'joomla/version');
-        } else {
-
-*/
-
+        $this->load->library($this->driver);
 
         // Load view data
         //---------------
 
         try {
-            $data['basename'] = $this->app_basename;
+            $data['webapp'] = $this->app_basename;
             $data['sites'] = $this->webapp_driver->get_sites();
-            // $data['is_ready'] = $this->webapp_driver->is_engine_ready();
+            $data['dep_issues'] = $this->webapp_driver->get_dependency_issues();
             $data['base_path'] = 'https://'.$_SERVER['SERVER_ADDR'].'/joomla/'; // FIXME
         } catch (Exception $e) {
             $this->page->view_exception($e);
@@ -150,17 +132,19 @@ FIXME
     /**
      * Destroy site.
      *
-     * @param string $folder_name Folder Name 
+     * @param string $site site
      * @return redirect to index after delete
      */
 
-    function destroy($folder_name)
+    function destroy($site)
     {
         // Load dependencies
         //------------------
 
-        $this->lang->load('joomla');
-        $this->load->library('joomla/Joomla');
+        $this->lang->load('webapp');
+        $this->load->library($this->site_driver, $site);
+
+        // FIXME: continue conversion
 
         if ($_POST) {
             $database_name = '';
@@ -174,25 +158,26 @@ FIXME
             $this->form_validation->set_policy('folder_name', 'joomla/Joomla', 'validate_folder_name_exists', TRUE);
             if ($delete_database && $database_name) {
                 $this->form_validation->set_policy('database_name', 'joomla/Joomla', 'validate_existing_database', TRUE);
-                $this->form_validation->set_policy('root_username', 'joomla/Joomla', 'validate_root_username', TRUE);
-                $this->form_validation->set_policy('root_password', 'joomla/Joomla', 'validate_root_password', TRUE);
+                $this->form_validation->set_policy('database_admin_username', 'joomla/Joomla', 'validate_database_admin_username', TRUE);
+                $this->form_validation->set_policy('database_admin_password', 'joomla/Joomla', 'validate_database_admin_password', TRUE);
             }
             $form_ok = $this->form_validation->run();
 
             if ($form_ok) {
                 $folder_name = $this->input->post('folder_name');
                 $database_name = $this->input->post('database_name');
-                $root_username = $this->input->post('root_username');
-                $root_password = $this->input->post('root_password');
+                $database_admin_username = $this->input->post('database_admin_username');
+                $database_admin_password = $this->input->post('database_admin_password');
 
                 try {
                     $this->joomla->delete_folder($folder_name);
                     if ($delete_database && $database_name) {
-                        $this->joomla->backup_database($database_name, $root_username, $root_password);
-                        $this->joomla->delete_database($database_name, $root_username, $root_password);
+                        $this->joomla->backup_database($database_name, $database_admin_username, $database_admin_password);
+                        $this->joomla->delete_database($database_name, $database_admin_username, $database_admin_password);
                     }
-                    $this->page->set_message(lang('joomla_project_delete_success'), 'info');
-                    redirect('/joomla');
+
+                    $this->page->set_status_deleted();
+                    redirect('/' . $this->app_basename);
                 } catch (Exception $e) {
                     $this->page->view_exception($e);
                 }
@@ -221,75 +206,94 @@ FIXME
         //---------------
 
         $this->lang->load('webapp');
-        $this->lang->load('joomla');
-        $this->load->library('joomla/Joomla');
-        $this->load->library('web_server/Httpd');
-        $this->load->factory('groups/Group_Manager_Factory');
+        $this->load->library($this->driver);
+        $this->load->library($this->site_driver, $site);
 
         // Set validation rules
         //---------------------
 
-        $use_exisiting_database = $this->input->post('use_exisiting_database');
+        if ($form_type == 'add') {
+            $use_existing_database = $this->input->post('use_existing_database');
 
-        $this->form_validation->set_policy('folder_name', 'joomla/Joomla', 'validate_folder_name', TRUE);
-        if($use_exisiting_database == "Yes")
-            $this->form_validation->set_policy('database_name', 'joomla/Joomla', 'validate_existing_database', TRUE);
-        else
-            $this->form_validation->set_policy('database_name', 'joomla/Joomla', 'validate_new_database', TRUE);
-        $this->form_validation->set_policy('database_user_name', 'joomla/Joomla', 'validate_database_username', TRUE);
-        $this->form_validation->set_policy('database_user_password', 'joomla/Joomla', 'validate_database_password', TRUE);
-        $this->form_validation->set_policy('root_username', 'joomla/Joomla', 'validate_root_username', TRUE);
-        $this->form_validation->set_policy('root_password', 'joomla/Joomla', 'validate_root_password', TRUE);
-        $this->form_validation->set_policy('joomla_version', 'joomla/Joomla', 'validate_joomla_version', TRUE);
-        $this->form_validation->set_policy('ssl_certificate', 'web_server/Httpd', 'validate_ssl_certificate', TRUE);
-        $this->form_validation->set_policy('group', 'web_server/Httpd', 'validate_group', TRUE);
+            if($use_existing_database == 'Yes')
+                $this->form_validation->set_policy('database_name', $this->driver, 'validate_existing_database', TRUE);
+            else
+                $this->form_validation->set_policy('database_name', $this->driver, 'validate_new_database', TRUE);
+
+            $this->form_validation->set_policy('database_username', $this->driver, 'validate_database_username', TRUE);
+            $this->form_validation->set_policy('database_password', $this->driver, 'validate_database_password', TRUE);
+            $this->form_validation->set_policy('database_admin_username', $this->driver, 'validate_database_admin_username', TRUE);
+            $this->form_validation->set_policy('database_admin_password', $this->driver, 'validate_database_admin_password', TRUE);
+            $this->form_validation->set_policy('webapp_version', $this->driver, 'validate_webapp_version', TRUE);
+        }
+
+        $check_exists = ($form_type === 'add') ? TRUE : FALSE; // FIXME - enable this
+
+        $this->form_validation->set_policy('site', $this->site_driver, 'validate_site', TRUE, $check_exists);
+        $this->form_validation->set_policy('aliases', $this->site_driver, 'validate_aliases');
+        $this->form_validation->set_policy('ssl_certificate', $this->site_driver, 'validate_ssl_certificate', TRUE);
+        $this->form_validation->set_policy('group', $this->site_driver, 'validate_group', TRUE);
 
         if (clearos_app_installed('ftp'))
-            $this->form_validation->set_policy('ftp', 'web_server/Httpd', 'validate_ftp_state', TRUE);
+            $this->form_validation->set_policy('ftp', $this->site_driver, 'validate_ftp_state', TRUE);
 
         if (clearos_app_installed('samba'))
-            $this->form_validation->set_policy('file', 'web_server/Httpd', 'validate_file_state', TRUE);
+            $this->form_validation->set_policy('file', $this->site_driver, 'validate_file_state', TRUE);
 
         $form_ok = $this->form_validation->run();
-
-        /*
-            $this->form_validation->set_policy('hostname', $this->site_library, 'validate_hostname', TRUE);
-            $this->form_validation->set_policy('aliases', $this->site_library, 'validate_aliases');
-        */
 
         // Extra validation
         //-----------------
 
-        /*
-            $resolvable = dns_get_record($this->input->post('hostname'));
+        if ($this->input->post('submit') && $this->input->post('site')) {
+            $resolvable = dns_get_record($this->input->post('site'));
             if (!$resolvable) {
-                $this->form_validation->set_error('hostname', lang('webapp_hostname_does_not_resolve_warning'));
+                $this->form_validation->set_error('site', lang('webapp_hostname_does_not_resolve_warning'));
                 $form_ok = FALSE;
             }
-        */
-
+        }
 
         // Handle form submit
         //-------------------
 
         if ($this->input->post('submit') && ($form_ok === TRUE)) {
-            $folder_name = $this->input->post('folder_name');
-            $database_name = $this->input->post('database_name');
-            $database_username = $this->input->post('database_user_name');
-            $database_user_password = $this->input->post('database_user_password');
-            $root_username = $this->input->post('root_username');
-            $root_password = $this->input->post('root_password');
-            $joomla_version = $this->input->post('joomla_version');
             $group = ($this->input->post('group')) ? $this->input->post('group') : '';
             $ftp_state = ($this->input->post('ftp')) ? $this->input->post('ftp') : FALSE;
             $file_state = ($this->input->post('file')) ? $this->input->post('file') : FALSE;
-            $ssl_certificate = $this->input->post('ssl_certificate');
+            $use_existing_db = ($this->input->post('use_existing_database') == 'Yes') ? TRUE : FALSE;
 
             try {
-                $this->joomla->add_project($folder_name, $database_name, $database_username, $database_user_password, $root_username, $root_password, $use_exisiting_database, $joomla_version, $group, $ssl_certificate, $ftp_state, $file_state);
-                $this->page->set_message(lang('joomla_project_add_success'), 'info');
-                redirect('/joomla');
+                if ($form_type == 'add') {
+                    $this->webapp_site_driver->add(
+                        $this->input->post('site'),
+                        $this->input->post('aliases'),
+                        $this->input->post('database_name'),
+                        $this->input->post('database_username'),
+                        $this->input->post('database_password'),
+                        $this->input->post('database_admin_username'),
+                        $this->input->post('database_admin_password'),
+                        $use_existing_db,
+                        $this->input->post('webapp_version'),
+                        $this->input->post('ssl_certificate'),
+                        $group,
+                        $ftp_state,
+                        $file_state
+                    );
 
+                    $this->page->set_status_added();
+                } else {
+                    $this->webapp_site_driver->update(
+                        $this->input->post('aliases'),
+                        $group,
+                        $ftp_state,
+                        $file_state,
+                        $this->input->post('ssl_certificate')
+                    );
+
+                    $this->page->set_status_updated();
+                }
+
+                redirect('/' . $this->app_basename);
             } catch (Exception $e) {
                 $this->page->view_exception($e);
                 return;
@@ -300,11 +304,8 @@ FIXME
         //------------------- 
 
         try {
-            $data['form_type'] = $form_type;
 
-            $this->joomla->check_dependencies();
-
-            $version_all = $this->joomla->get_versions();
+            $version_all = $this->webapp_driver->get_versions(TRUE);
             $versions = array();
 
             foreach ($version_all as $key => $value) {
@@ -312,17 +313,28 @@ FIXME
                     $versions[$value['file_name']] = $value['version'];
             }
 
+
+            $data['form_type'] = $form_type;
+            $data['webapp'] = $this->app_basename;
+            $data['site'] = $site;
             $data['versions'] = $versions;
             $data['default_version'] = 'latest.zip';
-
             $data['ftp_available'] = clearos_app_installed('ftp');
             $data['file_available'] = clearos_app_installed('samba');
-            $data['ssl_certificate_options'] = $this->httpd->get_ssl_certificate_options();
 
-            $groups = $this->group_manager->get_details();
+            $data['groups'] = $this->webapp_site_driver->get_group_options();
+            $data['ssl_certificate_options'] = $this->webapp_site_driver->get_ssl_certificate_options();
 
-            foreach ($groups as $group => $details)
-                $data['groups'][$group] = $group . ' - ' . $details['core']['description'];
+            if ($form_type == 'add') {
+                $data['ftp_enabled'] = TRUE;
+                $data['file_enabled'] = TRUE;
+            } else {
+                $data['ftp_enabled'] = $this->webapp_site_driver->get_ftp_state();
+                $data['file_enabled'] = $this->webapp_site_driver->get_file_state();
+                $data['ssl_certificate'] = $this->webapp_site_driver->get_ssl_certificate();
+                $data['group'] = $this->webapp_site_driver->get_group();
+            }
+
         } catch (Exception $e) {
             $this->page->view_exception($e);
             return;
@@ -331,8 +343,8 @@ FIXME
         // Load the view
         //--------------
 
-        // $this->page->view_form('add_project', $data, lang('joomla_app_name'));
+        $options['javascript'] = array(clearos_app_htdocs('webapp') . '/webapp.js.php');
 
-        $this->page->view_form('webapp/site', $data, lang('base_settings'));
+        $this->page->view_form('webapp/site', $data, lang('webapp_site'), $options);
     }
 }

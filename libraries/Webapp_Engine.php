@@ -57,13 +57,22 @@ clearos_load_language('webapp');
 
 use \clearos\apps\base\Daemon as Daemon;
 use \clearos\apps\base\Engine as Engine;
+use \clearos\apps\base\Shell as Shell;
 use \clearos\apps\mariadb\MariaDB as MariaDB;
 use \clearos\apps\web_server\Httpd as Httpd;
 
 clearos_load_library('base/Daemon');
 clearos_load_library('base/Engine');
+clearos_load_library('base/Shell');
 clearos_load_library('mariadb/MariaDB');
 clearos_load_library('web_server/Httpd');
+
+// Exceptions
+//-----------
+
+use \clearos\apps\base\Engine_Exception as Engine_Exception;
+
+clearos_load_library('base/Engine_Exception');
 
 ///////////////////////////////////////////////////////////////////////////////
 // C L A S S
@@ -83,6 +92,12 @@ clearos_load_library('web_server/Httpd');
 
 class Webapp_Engine extends Engine
 {
+    ///////////////////////////////////////////////////////////////////////////
+    // C O N S T A N T S
+    ///////////////////////////////////////////////////////////////////////////
+
+    const COMMAND_MYSQL = '/usr/bin/mysql';
+
     ///////////////////////////////////////////////////////////////////////////////
     // V A R I A B L E S
     ///////////////////////////////////////////////////////////////////////////////
@@ -107,15 +122,17 @@ class Webapp_Engine extends Engine
     }
 
     /**
-     * Returns readiness.
+     * Returns dependency issues.
      *
      * The following factors need to be reviewed for readiness:
      * - state of the web server
      * - state of the database server
      * - password initialization for database server
+     *
+     * @return array list of issues
      */
 
-    function get_dependency_readiness()
+    function get_dependency_issues()
     {
         clearos_profile(__METHOD__, __LINE__);
 
@@ -126,18 +143,18 @@ class Webapp_Engine extends Engine
         $mariadb_running_status = $mariadb->get_status();
         $mariadb_password_not_set = $mariadb->is_root_password_set();
 
-        $readiness = [];
+        $issues = [];
 
         if ($web_server_running_status == Daemon::STATUS_STOPPED)
-            $readiness[] = lang('webapp_web_server_not_running');
+            $issues[] = lang('webapp_web_server_not_running');
 
         if ($mariadb_running_status == Daemon::STATUS_STOPPED)
-            $readiness[] = lang('webapp_mariadb_server_not_running');
+            $issues[] = lang('webapp_mariadb_server_not_running');
 
         if (!$mariadb_password_not_set)
-            $readiness[] = lang('webapp_mariadb_password_not_set');
+            $issues[] = lang('webapp_mariadb_password_not_set');
 
-        return $readiness;
+        return $issues;
     }
 
     /**
