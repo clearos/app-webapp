@@ -53,13 +53,16 @@ use \Exception as Exception;
 
 class Webapp_Site extends ClearOS_Controller
 {
-    protected $driver = NULL;
     protected $app_basename = NULL;
+    protected $app_description = NULL;
+    protected $site_driver = NULL;
+    protected $driver = NULL;
 
     /**
      * Webapp server settings constructor.
      *
-     * @param string $app_basename web app name
+     * @param string $app_basename    webapp name
+     * @param string $app_description webapp description
      *
      * @return view
      */
@@ -75,7 +78,7 @@ class Webapp_Site extends ClearOS_Controller
     }
 
     /**
-     * Default controller.
+     * Webapp default controller.
      *
      * @return view
      */
@@ -121,6 +124,8 @@ class Webapp_Site extends ClearOS_Controller
     /**
      * Edit view.
      *
+     * @param string $site webapp site
+     *
      * @return view
      */
 
@@ -130,13 +135,13 @@ class Webapp_Site extends ClearOS_Controller
     }
 
     /**
-     * Destroy site.
+     * Delete site view.
      *
      * @param string $site site
-     * @return redirect to index after delete
+     * @return view
      */
 
-    function destroy($site)
+    function delete($site)
     {
         // Load dependencies
         //------------------
@@ -144,47 +149,68 @@ class Webapp_Site extends ClearOS_Controller
         $this->lang->load('webapp');
         $this->load->library($this->site_driver, $site);
 
-        // FIXME: continue conversion
+        // Set validation rules
+        //---------------------
 
-        if ($_POST) {
-            $database_name = '';
-            $folder_name = $this->input->post('folder_name');
-            $delete_database = $this->input->post('delete_database');
+        $delete_database = ($this->input->post('database_delete')) ? $this->input->post('database_delete') : FALSE;
 
-            if ($folder_name)
-                $database_name = $this->joomla->get_database_name($folder_name);
-            $_POST['database_name'] = $database_name;
-            $_POST['folder_name'] = $folder_name;
-            $this->form_validation->set_policy('folder_name', 'joomla/Joomla', 'validate_folder_name_exists', TRUE);
-            if ($delete_database && $database_name) {
-                $this->form_validation->set_policy('database_name', 'joomla/Joomla', 'validate_existing_database', TRUE);
-                $this->form_validation->set_policy('database_admin_username', 'joomla/Joomla', 'validate_database_admin_username', TRUE);
-                $this->form_validation->set_policy('database_admin_password', 'joomla/Joomla', 'validate_database_admin_password', TRUE);
-            }
-            $form_ok = $this->form_validation->run();
+        $this->form_validation->set_policy('database_delete', $this->site_driver, 'validate_database_delete_flag');
 
-            if ($form_ok) {
-                $folder_name = $this->input->post('folder_name');
-                $database_name = $this->input->post('database_name');
-                $database_admin_username = $this->input->post('database_admin_username');
-                $database_admin_password = $this->input->post('database_admin_password');
+        if ($delete_database) {
+            $this->form_validation->set_policy('database_delete_username', $this->site_driver, 'validate_database_username', TRUE);
+            $this->form_validation->set_policy('database_delete_password', $this->site_driver, 'validate_database_password', TRUE);
+        }
 
-                try {
-                    $this->joomla->delete_folder($folder_name);
-                    if ($delete_database && $database_name) {
-                        $this->joomla->backup_database($database_name, $database_admin_username, $database_admin_password);
-                        $this->joomla->delete_database($database_name, $database_admin_username, $database_admin_password);
-                    }
+        $form_ok = $this->form_validation->run();
 
-                    $this->page->set_status_deleted();
-                    redirect('/' . $this->app_basename);
-                } catch (Exception $e) {
-                    $this->page->view_exception($e);
-                }
-            } else {
-                $this->page->view_exception(validation_errors());
+        // Extra validation
+        //-----------------
+
+        if ($this->input->post('submit') && $form_ok && $delete_database) {
+            $database_problem = $this->webapp_site_driver->check_database(
+                $this->input->post('database_delete_username'),
+                $this->input->post('database_delete_password')
+            );
+            if ($database_problem) {
+                $this->form_validation->set_error('database_delete_password', $database_problem);
+                $form_ok = FALSE;
             }
         }
+
+
+        // Handle form submit
+        //-------------------
+
+        if ($this->input->post('submit') && ($form_ok === TRUE)) {
+            try {
+                if ($delete_database) {
+                    $this->webapp_site_driver->delete_database(
+                        $this->input->post('database_delete_username'),
+                        $this->input->post('database_delete_password'),
+                        TRUE
+                    );
+                }
+
+                $this->webapp_site_driver->delete(TRUE);
+                $this->page->set_status_deleted();
+                redirect('/' . $this->app_basename);
+            } catch (Exception $e) {
+                $this->page->view_exception($e);
+            }
+        }
+
+        // Load the view data 
+        //------------------- 
+
+        $data['webapp'] = $this->app_basename;
+        $data['site'] = $site;
+
+        // Load the view
+        //--------------
+
+        $options['javascript'] = array(clearos_app_htdocs('webapp') . '/webapp.js.php');
+
+        $this->page->view_form('webapp/delete_site', $data, lang('webapp_site'), $options);
     }
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -195,7 +221,7 @@ class Webapp_Site extends ClearOS_Controller
      * Common form.
      *
      * @param string $form_type form type
-     * @param string $site site name
+     * @param string $site      site name
      *
      * @return view
      */
@@ -215,16 +241,12 @@ class Webapp_Site extends ClearOS_Controller
         if ($form_type == 'add') {
             $use_existing_database = $this->input->post('use_existing_database');
 
-            if($use_existing_database == 'Yes')
-                $this->form_validation->set_policy('database_name', $this->driver, 'validate_existing_database', TRUE);
-            else
-                $this->form_validation->set_policy('database_name', $this->driver, 'validate_new_database', TRUE);
-
-            $this->form_validation->set_policy('database_username', $this->driver, 'validate_database_username', TRUE);
-            $this->form_validation->set_policy('database_password', $this->driver, 'validate_database_password', TRUE);
-            $this->form_validation->set_policy('database_admin_username', $this->driver, 'validate_database_admin_username', TRUE);
-            $this->form_validation->set_policy('database_admin_password', $this->driver, 'validate_database_admin_password', TRUE);
-            $this->form_validation->set_policy('webapp_version', $this->driver, 'validate_webapp_version', TRUE);
+            $this->form_validation->set_policy('database_name', $this->site_driver, 'validate_database_name', TRUE);
+            $this->form_validation->set_policy('database_username', $this->site_driver, 'validate_database_username', TRUE);
+            $this->form_validation->set_policy('database_password', $this->site_driver, 'validate_database_password', TRUE);
+            $this->form_validation->set_policy('database_admin_username', $this->site_driver, 'validate_database_username', TRUE);
+            $this->form_validation->set_policy('database_admin_password', $this->site_driver, 'validate_database_password', TRUE);
+            $this->form_validation->set_policy('webapp_version', $this->driver, 'validate_version', TRUE);
         }
 
         $check_exists = ($form_type === 'add') ? TRUE : FALSE; // FIXME - enable this
@@ -246,10 +268,24 @@ class Webapp_Site extends ClearOS_Controller
         //-----------------
 
         if ($this->input->post('submit') && $this->input->post('site')) {
+            // Make sure site name resolves via DNS
             $resolvable = dns_get_record($this->input->post('site'));
             if (!$resolvable) {
                 $this->form_validation->set_error('site', lang('webapp_hostname_does_not_resolve_warning'));
                 $form_ok = FALSE;
+            }
+
+            // Check existing database connectivity
+            if ($form_type == 'add') {
+                $database_problem = $this->webapp_site_driver->check_database(
+                    $this->input->post('database_admin_username'),
+                    $this->input->post('database_admin_password'),
+                    $this->input->post('database_name')
+                );
+                if ($database_problem) {
+                    $this->form_validation->set_error('database_admin_password', $database_problem);
+                    $form_ok = FALSE;
+                }
             }
         }
 
@@ -312,7 +348,6 @@ class Webapp_Site extends ClearOS_Controller
                 if ($value['clearos_path'])
                     $versions[$value['file_name']] = $value['version'];
             }
-
 
             $data['form_type'] = $form_type;
             $data['webapp'] = $this->app_basename;

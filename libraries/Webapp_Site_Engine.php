@@ -7,7 +7,7 @@
  * @package    webapp
  * @subpackage libraries
  * @author     ClearFoundation <developer@clearfoundation.com>
- * @copyright  2013-2014 ClearFoundation
+ * @copyright  2013-2017 ClearFoundation
  * @license    http://www.gnu.org/copyleft/lgpl.html GNU Lesser General Public License version 3 or later
  * @link       http://www.clearfoundation.com/docs/developer/apps/webapp/
  */
@@ -46,6 +46,7 @@ require_once $bootstrap . '/bootstrap.php';
 // T R A N S L A T I O N S
 ///////////////////////////////////////////////////////////////////////////////
 
+clearos_load_language('base');
 clearos_load_language('network');
 clearos_load_language('webapp');
 
@@ -57,13 +58,19 @@ clearos_load_language('webapp');
 //--------
 
 use \clearos\apps\base\Engine as Engine;
+use \clearos\apps\base\File as File;
+use \clearos\apps\base\Folder as Folder;
 use \clearos\apps\base\Shell as Shell;
 use \clearos\apps\groups\Group_Manager_Factory as Group_Manager_Factory;
+use \clearos\apps\webapp\Webapp_Engine as Webapp_Engine;
 use \clearos\apps\web_server\Httpd as Httpd;
 
 clearos_load_library('base/Engine');
+clearos_load_library('base/File');
+clearos_load_library('base/Folder');
 clearos_load_library('base/Shell');
 clearos_load_library('groups/Group_Manager_Factory');
+clearos_load_library('webapp/Webapp_Engine');
 clearos_load_library('web_server/Httpd');
 
 // Exceptions
@@ -86,7 +93,7 @@ clearos_load_library('base/Validation_Exception');
  * @package    webapp
  * @subpackage libraries
  * @author     ClearFoundation <developer@clearfoundation.com>
- * @copyright  2013-2014 ClearFoundation
+ * @copyright  2013-2017 ClearFoundation
  * @license    http://www.gnu.org/copyleft/lgpl.html GNU Lesser General Public License version 3 or later
  * @link       http://www.clearfoundation.com/docs/developer/apps/webapp/
  */
@@ -97,44 +104,205 @@ class Webapp_Site_Engine extends Engine
     // C O N S T A N T S
     ///////////////////////////////////////////////////////////////////////////////
 
-    const PATH_SOURCE = '/usr/share';
-    const PATH_INSTALL = '/var/clearos';
-    const PATH_ARCHIVE = 'archive';
-    const PATH_RELEASES = 'releases';
-    const PATH_WEBROOT = 'webroot';
-    const PATH_LIVE = 'live';
-    const COMMAND_UNZIP = '/usr/bin/unzip';
-    const COMMAND_TAR = '/bin/tar';
-    const COMMAND_OPENSSL = '/usr/bin/openssl';
-    const COMMAND_PATCH = '/usr/bin/patch';
-    const DEFAULT_HOSTNAME = 'system.lan';
-    const DEFAULT_DOMAIN = 'system.lan';
+    const COMMAND_MYSQL = '/usr/bin/mysql';
+    const COMMAND_MYSQLDUMP = '/usr/bin/mysqldump';
+    const COMMAND_ZIP = '/usr/bin/zip';
 
     ///////////////////////////////////////////////////////////////////////////////
     // V A R I A B L E S
     ///////////////////////////////////////////////////////////////////////////////
 
-    protected $config = array();
     protected $site = NULL;
     protected $webapp = NULL;
+    protected $config = array();
+    protected $backup_path = '';
 
     ///////////////////////////////////////////////////////////////////////////////
     // M E T H O D S
     ///////////////////////////////////////////////////////////////////////////////
 
     /**
-     * Webapp constructor.
+     * Webapp site constructor.
      *
-     * @param string $webapp webapp basename
-     * @param string $site   site name
+     * @param string $webapp      webapp basename
+     * @param string $site        site name
+     * @param string $backup_path backup path name
      */
 
-    public function __construct($webapp, $site)
+    public function __construct($webapp, $site, $backup_path)
     {
         clearos_profile(__METHOD__, __LINE__);
 
         $this->webapp = $webapp;
         $this->site = $site;
+        $this->backup_path = $backup_path;
+    }
+
+    /**
+     * Creates backup of site folder.
+     *
+     * @return void
+     */
+
+    public function backup()
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        $site_root = $this->get_site_root();
+
+        $zip_path = $this->backup_path . '/' . $this->site . '__' . date('Y-m-d-H-i-s') . '.zip';
+        $params = "-r $zip_path $site_root";
+
+        $folder = new Folder($site_root);
+
+        if ($folder->exists()) {
+            $shell = new Shell();
+            $shell->execute(self::COMMAND_ZIP, $params, TRUE);
+        }
+    }
+
+    /**
+     * Creates database backup.
+     *
+     * @param string $username database username
+     * @param string $password database password
+     *
+     * @return void
+     * @throws Engine_Exception
+     */
+ 
+    public function backup_database($username, $password)
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        Validation_Exception::is_valid($this->validate_database_username($username));
+        Validation_Exception::is_valid($this->validate_database_password($password));
+
+        $database_name = $this->get_database_name();
+
+        $sql_file_path = $this->backup_path . '/' . $database_name . '__' . date('Y-m-d-H-i-s') . '.sql';
+
+        $params = " -u'$username' -p'$password' '$database_name' > '$sql_file_path'";
+
+        $shell = new Shell();
+        $shell->execute(self::COMMAND_MYSQLDUMP, $params, FALSE, $options);
+    }
+
+    /**
+     * Checks for connectivity issues with database.
+     *
+     * @param string $username database username
+     * @param string $password database password
+     * @param string $database database name
+     *
+     * @return string error message if unable to connect with database
+     */
+
+    public function check_database($username, $password, $database = '')
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        Validation_Exception::is_valid($this->validate_database_username($username));
+        Validation_Exception::is_valid($this->validate_database_password($password));
+
+        if (empty($database)) {
+            $database = $this->get_database_name();
+            $is_new = FALSE;
+        } else {
+            $is_new = TRUE;
+        }
+
+        $params = "-u'$username' -p'$password' -e \"SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '$database'\"";
+        $shell = new Shell();
+
+        try {
+            $shell->execute(self::COMMAND_MYSQL, $params, FALSE);
+        } catch (Engine_Exception $e) {
+            $output_message = preg_replace('/^error[^:]*:/i', '', $e->getMessage());
+
+            return $output_message;
+        }
+
+        $output = $shell->get_output();
+
+        if (strpos($output_message, 'error') !== FALSE)
+            return $output_message;
+        else if (!$is_new && !$output)
+            return lang('webapp_database_does_not_exist');
+        else if ($is_new && $output)
+            return lang('webapp_database_already_exists');
+    }
+
+    /**
+     * Deletes site.
+     *
+     * @param boolean $do_backup set to TRUE for creating backup
+     *
+     * @return void
+     */
+
+    public function delete($do_backup)
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        // Run backup if requested
+        //------------------------
+
+        if ($do_backup)
+            $this->backup();
+
+        // Delete web site via Httpd API
+        // -----------------------------
+
+        $httpd = new Httpd();
+        $httpd->delete_site($this->site, TRUE);
+    }
+
+    /**
+     * Deletes database with the option of creating a backup.
+     *
+     * @param string  $username  database username
+     * @param string  $password  database password
+     * @param boolean $do_backup flag to indicate backup
+     *
+     * @return Exception is somethings goes wrong with MYSQL 
+     */
+
+    public function delete_database($username, $password, $do_backup)
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        Validation_Exception::is_valid($this->validate_database_username($username));
+        Validation_Exception::is_valid($this->validate_database_password($password));
+
+        if ($do_backup)
+            $this->backup_database($username, $password);
+
+        $database_name = $this->get_database_name();
+
+        $params = " -u'$username' -p'$password' -e \"DROP DATABASE \"$database_name\"\"";
+
+        $shell = new Shell();
+        $retval = $shell->execute(self::COMMAND_MYSQL, $params, FALSE);
+    }
+
+    /**
+     * Returns document root.
+     *
+     * The document root typically lives under the "html" directory in
+     * the site's root directory.
+     *
+     * @return string document root
+     * @throws Engine_Exception
+     */
+
+    public function get_document_root()
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        $httpd = new Httpd();
+
+        return $httpd->get_document_root($this->site);
     }
 
     /**
@@ -208,6 +376,22 @@ class Webapp_Site_Engine extends Engine
     }
 
     /**
+     * Returns site root.
+     *
+     * @return string site root
+     * @throws Engine_Exception
+     */
+
+    public function get_site_root()
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        $httpd = new Httpd();
+
+        return $httpd->get_site_root($this->site);
+    }
+
+    /**
      * Returns configured SSL certificate.
      *
      * @return string SSL certificate name
@@ -257,7 +441,6 @@ class Webapp_Site_Engine extends Engine
     {
         clearos_profile(__METHOD__, __LINE__);
 
-
         Validation_Exception::is_valid($this->validate_aliases($aliases));
         Validation_Exception::is_valid($this->validate_group($group));
         Validation_Exception::is_valid($this->validate_ftp_state($ftp_state));
@@ -298,41 +481,41 @@ class Webapp_Site_Engine extends Engine
     }
 
     /**
-     * Validate admin username.
+     * Validate database delete flag.
      *
-     * @param string $username Username
+     * @param boolean $flag database delete flag
      *
-     * @return string error message if exists
+     * @return string error message if delete flag is invalid
      */
 
-    public function validate_database_admin_username($username)
+    public function validate_database_delete_flag($flag)
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        if (! preg_match('/^([a-z0-9_\-\.\$]+)$/', $username))
-            return lang('base_username_invalid');
+        if (! clearos_is_valid_boolean($flag))
+            return lang('base_state_invalid');
     }
 
     /**
-     * Validate database admin password.
+     * Validate database name.
      *
-     * @param string $password Password
+     * @param string $name database name
      *
-     * @return string error message if exists
+     * @return string error message if database name is invalid
      */
 
-    public function validate_database_admin_password($password)
+    public function validate_database_name($name)
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        if (! preg_match('/.*\S.*/', $password))
-            return lang('base_password_is_invalid');
+        if (! preg_match('/^[\w_\-]+$/', $name))
+            return lang('webapp_database_name_invalid');
     }
 
     /**
      * Validate database password.
      *
-     * @param string $password Password
+     * @param string $password password
      *
      * @return string error message if exists
      */
@@ -359,41 +542,6 @@ class Webapp_Site_Engine extends Engine
 
         if (! preg_match('/^([a-z0-9_\-\.\$]+)$/', $username))
             return lang('base_username_invalid');
-    }
-
-    /**
-     * Validate if database is exisitng.
-     *
-     * @param string $database_name Database Name
-     *
-     * @return string error message if database name is not exists
-     */
-
-    public function validate_existing_database($database_name)
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        // FIXME: SQL inject vulnerability, no _POST allowed in API calls.
-        $admin_username = $_POST['database_admin_username'];
-        $admin_password = $_POST['database_admin_password'];
-        $command = "mysql -u $admin_username -p$admin_password -e \"SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '$database_name'\"";
-        $shell = new Shell();
-
-        try {
-            $retval = $shell->execute(
-                self::COMMAND_MYSQL, $command, FALSE, $options
-            );
-        } catch (Engine_Exception $e) {
-            return $e->get_message();
-        }
-
-        $output = $shell->get_output();
-        $output_message = strtolower($output);
-
-        if (strpos($output_message, 'error') !== FALSE)
-            return lang('webapp_unable_connect_via_admin_user');
-        else if(!$output)
-            return lang('webapp_database_does_not_exist');
     }
 
     /**
@@ -448,39 +596,6 @@ class Webapp_Site_Engine extends Engine
     }
 
     /**
-     * Validate if database is new.
-     *
-     * @param string $database_name Database Name
-     *
-     * @return string error message if Database name is exists
-     */
-
-    public function validate_new_database($database_name)
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        // FIXME: SQL inject vulnerability, no _POST allowed in API calls.
-        $admin_username = $_POST['database_admin_username'];
-        $admin_password = $_POST['database_admin_password'];
-        $command = "mysql -u $admin_username -p$admin_password -e \"SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '$database_name'\"";
-        $shell = new Shell();
-
-        try {
-            $retval = $shell->execute(self::COMMAND_MYSQL, $command, FALSE, $options);
-        } catch (Engine_Exception $e) {
-            return $e->get_message();
-        }
-
-        $output = $shell->get_output();
-        $output_message = strtolower($output);
-
-        if (strpos($output_message, 'error') !== FALSE)
-            return lang('webapp_unable_connect_via_admin_user');
-        else if($output)
-            return lang('webapp_database_already_exists');
-    }
-
-    /**
      * Validation routine for site.
      *
      * @param string $site site
@@ -512,22 +627,6 @@ class Webapp_Site_Engine extends Engine
         $httpd = new Httpd();
 
         return $httpd->validate_ssl_certificate($certificate);
-    }
-
-    /**
-     * Validation routine for version.
-     *
-     * @param string $version version
-     *
-     * @return error message if version is invalid
-     */
-
-    public function validate_version($version)
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        if (! in_array($version, $this->get_versions()))
-            return lang('webapp_version_invalid');
     }
 }
 

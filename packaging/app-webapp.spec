@@ -25,12 +25,13 @@ Group: ClearOS/Libraries
 Requires: app-base-core
 Requires: app-base-core >= 1:1.5.24
 Requires: app-certificate-manager-core
-Requires: app-flexshare-core >= 1:1.5.30
+Requires: app-flexshare-core >= 1:2.4.3
 Requires: app-groups-core
 Requires: app-network-core
-Requires: app-web-server-core
+Requires: app-web-server-core >= 1:2.4.5
 Requires: app-mariadb-core
 Requires: openssl
+Requires: zip
 
 %description core
 The Web App Engine provides libraries and tools for building web-based applications.

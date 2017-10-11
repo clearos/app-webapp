@@ -17,6 +17,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 $this->lang->load('base');
+$this->lang->load('webapp');
 $this->lang->load('web_server');
 $this->lang->load('certificate_manager');
 

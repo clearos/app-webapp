@@ -1,1 +1,3 @@
 #!/bin/sh
+
+/usr/sbin/addsudo /usr/bin/zip app-webapp-core

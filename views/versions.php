@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Webapp summary view.
+ * Webapp versions view.
  *
  * @category   apps
  * @package    webapp
@@ -19,41 +19,36 @@
 $this->lang->load('webapp');
 
 ///////////////////////////////////////////////////////////////////////////////
-// Headers
+// Form
 ///////////////////////////////////////////////////////////////////////////////
 
 $headers = array(
-    lang('webapp_site_name'),
+    lang('webapp_version'),
 );
 
 ///////////////////////////////////////////////////////////////////////////////
 // Buttons
 ///////////////////////////////////////////////////////////////////////////////
 
-if ($dep_issues)
-    $buttons = array();
-else
-    $buttons = array(anchor_custom('/app/' . $webapp . '/site/add', lang('webapp_add_site'), 'high', array('target' => '_self')));
+$buttons  = array();
 
 ///////////////////////////////////////////////////////////////////////////////
 // Items
 ///////////////////////////////////////////////////////////////////////////////
 
-foreach ($sites as $value) {
-    $item['title'] = $value['name'];
-    $access_action = $base_path.$value['name'];
-    $access_admin_action = $base_path.$value['name'].'/wp-admin';
-    $delete_action = 'javascript:';
+$items = array();
 
-    $item['anchors'] = button_set(
-        array(
-            anchor_custom($access_action, lang('webapp_access'), 'high', array('target' => '_blank')),
-            anchor_edit('/app/' . $webapp . '/site/edit/' . $value['name']),
-            anchor_delete('/app/' . $webapp . '/site/delete/' . $value['name'])
-        )
+foreach ($versions as $value) {
+    if ($value['clearos_path']) {
+        $button = anchor_delete('/app/' . $webapp . '/version/delete/' . $value['file_name']);
+    } else {
+        $button = anchor_custom('/app/' . $webapp . '/version/download/' . $value['file_name'], lang('base_download'));
+    }
+
+    $item['anchors'] = button_set(array($button));
+    $item['details'] = array(
+        $webapp_description . ' ' . $value['version'],
     );
-
-    $item['details'] = array($value['name']);
 
     $items[] = $item;
 }
@@ -63,7 +58,7 @@ foreach ($sites as $value) {
 ///////////////////////////////////////////////////////////////////////////////
 
 echo summary_table(
-    lang('webapp_sites'),
+    lang('webapp_versions'),
     $buttons,
     $headers,
     $items

@@ -50,11 +50,8 @@ clearos_load_language('webapp');
 header('Content-Type: application/x-javascript');
 ?>
 
-//////////////////////////////////////////////////////////////////////////////
-// For add/edit site page
-///////////////////////////////////////////////////////////////////////////////
-
 $(document).ready(function() {
+
     // Translations
     //-------------
 
@@ -67,16 +64,35 @@ $(document).ready(function() {
     $("#use_existing_database").change(function(){
         selectDatabase();
     })
+
+    $("#database_delete").change(function(){
+        updateDeleteForm();
+    });
+
+    updateDeleteForm();
+
+    // Functions
+    //----------
+
+    function updateDeleteForm() {
+        if ($('#database_delete').is(":checked")) {
+            $("#database_delete_username_field").show();
+            $("#database_delete_password_field").show();
+        } else {
+            $("#database_delete_username_field").hide();
+            $("#database_delete_password_field").hide();
+        }
+    }
+
+    function selectDatabase()
+    {
+        var option = $("#use_existing_database").val();
+
+        if (option == "Yes")
+            $("#database_name_label").text(lang_existing_database_name);
+        else
+            $("#database_name_label").text(lang_new_database_name);
+    }
 })
-
-function selectDatabase()
-{
-    var option = $("#use_existing_database").val();
-
-    if(option == "Yes")
-        $("#database_name_label").text(lang_existing_database_name);
-    else
-        $("#database_name_label").text(lang_new_database_name);
-}
 
 // vim: ts=4 syntax=javascript
