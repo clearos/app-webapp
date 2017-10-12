@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Webapp site delete view.
+ * Webapp dependencies view.
  *
  * @category   apps
  * @package    webapp
@@ -22,19 +22,23 @@ $this->lang->load('webapp');
 // Form
 ///////////////////////////////////////////////////////////////////////////////
 
-echo form_open('/' . $webapp . '/site/delete/' . $site);
-echo form_header(lang('webapp_confirm_delete'));
-
-echo field_checkbox('database_delete', $database_delete, lang('webapp_delete_database'));
-echo field_input('database_delete_username', $database_admin_username, lang('webapp_database_admin_username'), FALSE, [ 'hide_field' => TRUE ]);
-echo field_password('database_delete_password', $database_admin_password, lang('webapp_database_admin_password'), FALSE, [ 'hide_field' => TRUE ]);
-
-echo field_button_set(
-    [
-        form_submit_delete('submit', 'high'),
-        anchor_cancel('/app/' . $webapp . '/site')
-    ]
+$options['buttons']  = array(
+    anchor_custom('/app/' . $webapp . '/backup/index', "Backups", 'high', array('target' => '_self')),
+    anchor_custom('/app/mariadb', "MariaDB Server", 'high', array('target' => '_blank')),
+    anchor_custom('/app/web_server', "Web Server", 'high', array('target' => '_blank')),
 );
 
-echo form_footer();
-echo form_close();
+if ($readiness) {
+    $lines = '<ul>';
+    foreach ($readiness as $line)
+        $lines .= '<li>' . $line . '</li>';
+    $lines .= '</ul>';
+
+    echo infobox_warning(lang('base_warning'), $lines);
+}
+
+echo infobox_highlight(
+    lang('webapp_dependencies'),
+    lang('webapp_dependencies_description'),
+    $options
+);

@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Webapp version engine class.
+ * Webapp backup engine class.
  *
  * @category   apps
  * @package    webapp
@@ -57,18 +57,27 @@ clearos_load_language('webapp');
 
 use \clearos\apps\base\Engine as Engine;
 use \clearos\apps\base\File as File;
+use \clearos\apps\base\Folder as Folder;
 use \clearos\apps\base\Shell as Shell;
 
 clearos_load_library('base/Engine');
 clearos_load_library('base/File');
+clearos_load_library('base/Folder');
 clearos_load_library('base/Shell');
+
+// Exceptions
+//-----------
+
+use \clearos\apps\base\Engine_Exception as Engine_Exception;
+
+clearos_load_library('base/Engine_Exception');
 
 ///////////////////////////////////////////////////////////////////////////////
 // C L A S S
 ///////////////////////////////////////////////////////////////////////////////
 
 /**
- * Webapp version engine class.
+ * Webapp backup engine class.
  *
  * @category   apps
  * @package    webapp
@@ -79,13 +88,14 @@ clearos_load_library('base/Shell');
  * @link       http://www.clearfoundation.com/docs/developer/apps/webapp/
  */
 
-class Webapp_Version_Engine extends Engine
+class Webapp_Backup_Engine extends Engine
 {
     ///////////////////////////////////////////////////////////////////////////
     // C O N S T A N T S
     ///////////////////////////////////////////////////////////////////////////
 
-    const COMMAND_WGET = '/usr/bin/wget';
+    const COMMAND_MYSQLDUMP = '/usr/bin/mysqldump';
+    const COMMAND_ZIP = '/usr/bin/zip';
 
     ///////////////////////////////////////////////////////////////////////////////
     // V A R I A B L E S
@@ -93,14 +103,13 @@ class Webapp_Version_Engine extends Engine
 
     protected $webapp = NULL;
     protected $path = NULL;
-    protected $versions = [];
 
     ///////////////////////////////////////////////////////////////////////////////
     // M E T H O D S
     ///////////////////////////////////////////////////////////////////////////////
 
     /**
-     * Webapp version constructor.
+     * Webapp backup constructor.
      *
      * @param string $webapp webapp basename
      */
@@ -113,16 +122,68 @@ class Webapp_Version_Engine extends Engine
         include clearos_app_base($webapp) . '/deploy/config.php';
 
         $this->webapp = $webapp;
-        $this->path = $config['version_path'];
-        $this->versions = $config['versions'];
+        $this->path = $config['backup_path'];
     }
 
     /**
-     * Delete downloaded webapp version.
+     * Creates database backup.
      *
-     * @param string $file_name file name
+     * @param string $database_name database name
+     * @param string $username      database username
+     * @param string $password      database password
+     *:w
+     * @return void
+     * @throws Engine_Exception
+     */
+
+    public function backup_database($database_name, $username, $password)
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        /* 
+        FIXME
+        Validation_Exception::is_valid($this->validate_database_name($name));
+        Validation_Exception::is_valid($this->validate_database_username($username));
+        Validation_Exception::is_valid($this->validate_database_password($password));
+        */
+
+        $sql_file_path = $this->path . '/' . $database_name . '__' . date('Y-m-d-H-i-s') . '.sql';
+
+        $params = " -u'$username' -p'$password' '$database_name' > '$sql_file_path'";
+
+        $shell = new Shell();
+        $shell->execute(self::COMMAND_MYSQLDUMP, $params, FALSE, $options);
+    }
+
+    /**
+     * Creates backup of site folder.
      *
-     * @return TRUE if delete completed
+     * @param string $site      site name
+     * @param string $site_root site document root
+     * @return void
+     */
+
+    public function backup_site($site, $site_root)
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        $zip_path = $this->path . '/' . $site . '__' . date('Y-m-d-H-i-s') . '.zip';
+        $params = "-r $zip_path $site_root";
+
+        $folder = new Folder($site_root);
+
+        if ($folder->exists()) {
+            $shell = new Shell();
+            $shell->execute(self::COMMAND_ZIP, $params, TRUE);
+        }
+    }
+
+    /**
+     * Deletes backup from system.
+     *
+     * @param string $file_name backup file name
+     *
+     * @return void
      * @throws Engine_Exception
      */
 
@@ -130,153 +191,66 @@ class Webapp_Version_Engine extends Engine
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        $path_file = $this->path . '/' . $file_name;
+        $file_path = $this->path . '/' . $file_name;
+        $file = new File($file_path);
 
-        $file = new File($path_file, TRUE);
-
-        if (!$file->exists())
-           return FALSE;
-
-        $file->delete();
-
-        return TRUE;
+        if ($file->exists())
+            $file->delete();
+        else
+            throw new Engine_Exception(lang('base_file_not_found'));
     }
 
     /**
-     * Downloads webapp install file from given location.
+     * Download action for backup.
      *
-     * @param string $file_name version file name
+     * @param string $file_name backup file name
      *
-     * @return TRUE if download completed
+     * @return download
      * @throws Engine_Exception
      */
 
-    public function download($file_name)
+    public function get_path($file_name)
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        $path_file = $this->path . '/' . $file_name;
-        $file = new File($path_file, TRUE);
+        $file_path = $this->path . '/' . $file_name;
 
-        if ($file->exists())
-           return;
+        $file = new File($file_path, FALSE);
 
-        $versions = $this->listing();
-        $download_url = '';
+        if (!$file->exists())
+            throw new Engine_Exception(lang('base_file_not_found'));
 
-        foreach ($versions as $key => $value) {
-            if ($value['file_name'] == $file_name) {
-                $download_url = $value['download_url'];
-                break;
-            }
-        }
-
-        $shell = new Shell();
-        $params = "'$download_url' -P '$this->path'";
-
-        $retval = $shell->execute(self::COMMAND_WGET, $params, FALSE);
-
-        return TRUE;
+        return $file_path;
     }
 
     /**
-     * Returns webapp versions.
+     * Return list of available backups.
      *
-     * @param boolean $only_downloaded only return downloaded versions
-     *
-     * @return @array array of available versions
+     * @return array list of available backups
+     * @throws Engine_Exception
      */
 
-    public function listing($only_downloaded = FALSE)
+    public function get_list()
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        $versions = $this->versions;
+        $list = array();
+        $folder = new Folder($this->path);
 
-        foreach ($this->versions as $key => $value) {
-            $versions[$key]['file_name'] = basename($versions[$key]['download_url']);
-            $versions[$key]['clearos_path'] = $this->_get_version_downloaded_path(basename($versions[$key]['download_url']));
+        if ($folder->exists())
+            $list = $folder->get_listing(TRUE, TRUE);
 
-            if ($only_downloaded) {
-                if (!$versions[$key]['clearos_path'])
-                    unset($versions[$key]);
-            }
-        }
-
-        return $versions;
+        return $list;
     }
 
     ///////////////////////////////////////////////////////////////////////////
     // V A L I D A T I O N   R O U T I N E S                                 //
     ///////////////////////////////////////////////////////////////////////////
 
-    /**
-     * Validation routine for version.
-     *
-     * @param string  $version         version
-     * @param boolean $only_downloaded validate against only downloaded versions
-     *
-     * @return error message if version is invalid
-     */
-
-    public function validate_version($version, $only_downloaded = TRUE)
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        $versions = $this->listing();
-
-        foreach ($versions as $details) {
-            if ($details['version'] == $version) {
-                if ($only_downloaded && empty($details['clearos_path']))
-                    return lang('webapp_version_invalid');
-                else
-                    return;
-            }
-        }
-
-        return lang('webapp_version_invalid');
-    }
 
     ///////////////////////////////////////////////////////////////////////////////
     // P R I V A T E  M E T H O D S
     ///////////////////////////////////////////////////////////////////////////////
-
-    /**
-     * Returns local system download path.
-     * 
-     * @param @string $version_name version name 
-     *
-     * @return @string path to downloaded version file if available
-     * @throws Engine_Exception
-     */
-
-    protected function _get_version_downloaded_path($version_name)
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-        $filename = $this->path . '/' . $version_name;
-        $file = new File($filename, TRUE);
-
-        if ($file->exists())
-            return $filename;
-
-        return FALSE;
-    }
-
-    /**
-     * Return update version data.
-     * 
-     * @param array $versions base version array
-     *
-     * @return array updated version array
-     * @throws Engine_Exception
-     */
-
-    protected function _update_version_data($versions)
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
-    }
 }
 
 // vim: syntax=php ts=4

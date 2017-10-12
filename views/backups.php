@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Webapp summary view.
+ * Webapp backups View.
  *
  * @category   apps
  * @package    webapp
@@ -16,6 +16,7 @@
 // Load dependencies
 ///////////////////////////////////////////////////////////////////////////////
 
+$this->lang->load('base');
 $this->lang->load('webapp');
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -23,32 +24,35 @@ $this->lang->load('webapp');
 ///////////////////////////////////////////////////////////////////////////////
 
 $headers = array(
-    lang('webapp_site_name'),
+    lang('webapp_backup'),
 );
 
 ///////////////////////////////////////////////////////////////////////////////
 // Buttons
 ///////////////////////////////////////////////////////////////////////////////
 
-if ($dep_issues)
-    $buttons = array();
-else
-    $buttons = array(anchor_custom('/app/' . $webapp . '/site/add', lang('webapp_add_site'), 'high', array('target' => '_self')));
+$buttons  = array(
+    anchor_custom('/app/' . $webapp, lang('base_return_to_summary'))
+);
 
 ///////////////////////////////////////////////////////////////////////////////
 // Items
 ///////////////////////////////////////////////////////////////////////////////
 
-foreach ($sites as $value) {
+foreach ($backups as $value) {
     $item['title'] = $value['name'];
+    $download_action = '/app/' . $webapp . '/backup/download/' . $value['name'];
+    $delete_action = '/app/' . $webapp . '/backup/delete/' . $value['name'];
     $item['anchors'] = button_set(
         array(
-            anchor_custom('https://' . $value['name'], lang('webapp_access'), 'high', array('target' => '_blank')),
-            anchor_edit('/app/' . $webapp . '/site/edit/' . $value['name']),
-            anchor_delete('/app/' . $webapp . '/site/delete/' . $value['name'])
+            anchor_custom($download_action, lang('base_download'), 'high'),
+            anchor_delete($delete_action, 'low'),
         )
     );
-    $item['details'] = array($value['name']);
+
+    $item['details'] = array(
+        $value['name']
+    );
 
     $items[] = $item;
 }
@@ -58,7 +62,7 @@ foreach ($sites as $value) {
 ///////////////////////////////////////////////////////////////////////////////
 
 echo summary_table(
-    lang('webapp_sites'),
+    lang('webapp_backups'),
     $buttons,
     $headers,
     $items

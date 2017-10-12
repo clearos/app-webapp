@@ -57,22 +57,15 @@ clearos_load_language('webapp');
 
 use \clearos\apps\base\Daemon as Daemon;
 use \clearos\apps\base\Engine as Engine;
-use \clearos\apps\base\Shell as Shell;
 use \clearos\apps\mariadb\MariaDB as MariaDB;
 use \clearos\apps\web_server\Httpd as Httpd;
+use \clearos\apps\webapp\Webapp_Version_Engine as Webapp_Version_Engine;
 
 clearos_load_library('base/Daemon');
 clearos_load_library('base/Engine');
-clearos_load_library('base/Shell');
 clearos_load_library('mariadb/MariaDB');
 clearos_load_library('web_server/Httpd');
-
-// Exceptions
-//-----------
-
-use \clearos\apps\base\Engine_Exception as Engine_Exception;
-
-clearos_load_library('base/Engine_Exception');
+clearos_load_library('webapp/Webapp_Version_Engine');
 
 ///////////////////////////////////////////////////////////////////////////////
 // C L A S S
@@ -92,12 +85,6 @@ clearos_load_library('base/Engine_Exception');
 
 class Webapp_Engine extends Engine
 {
-    ///////////////////////////////////////////////////////////////////////////
-    // C O N S T A N T S
-    ///////////////////////////////////////////////////////////////////////////
-
-    const COMMAND_MYSQL = '/usr/bin/mysql';
-
     ///////////////////////////////////////////////////////////////////////////////
     // V A R I A B L E S
     ///////////////////////////////////////////////////////////////////////////////
@@ -114,7 +101,7 @@ class Webapp_Engine extends Engine
      * @param string $webapp webapp basename
      */
 
-    function __construct($webapp)
+    public function __construct($webapp)
     {
         clearos_profile(__METHOD__, __LINE__);
 
@@ -132,7 +119,7 @@ class Webapp_Engine extends Engine
      * @return array list of issues
      */
 
-    function get_dependency_issues()
+    public function get_dependency_issues()
     {
         clearos_profile(__METHOD__, __LINE__);
 
@@ -157,28 +144,26 @@ class Webapp_Engine extends Engine
         return $issues;
     }
 
-    /**
-     * List of sites.
+    /** 
+     * Returns readiness of underlying stack.
      *
-     * @return array $list of all sites for given webapp
+     * @return array array of error messagse if there are issues with the stack
      */
 
-    function get_sites()
+    public function get_readiness()
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        $httpd = new Httpd();
-        $webapps = $httpd->get_webapps();
+        $issues = $this->get_dependency_issues();
 
-        $list = array();
+        $version = new Webapp_Version_Engine($this->webapp);
 
-        foreach ($webapps as $key => $value) {
-            $list[$key]['name'] = $key;
-            // $list[$key]['database'] = $this->get_database_name($key);
-            // FIXME
-        }
+        $downloaded_versions = $version->listing(TRUE);
 
-        return $list;
+        if (empty($downloaded_versions))
+            $issues[] = lang('webapp_no_downloaded_versions');
+
+        return $issues;
     }
 }
 
