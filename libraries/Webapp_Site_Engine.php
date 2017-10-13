@@ -320,10 +320,6 @@ class Webapp_Site_Engine extends Engine
     }
 
     /**
-     * Returns a list of valid web certificates for site.
-     *
-     * @return array list of available certificates
-    /**
      * Returns document root.
      *
      * The document root typically lives under the "html" directory in
@@ -718,7 +714,8 @@ class Webapp_Site_Engine extends Engine
     /**
      * Validation routine for site.
      *
-     * @param string $site site
+     * @param string  $site         site
+     * @param boolean $check_exists check existence
      *
      * @return string error message if site is invalid
      */
