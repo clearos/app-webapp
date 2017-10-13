@@ -125,7 +125,7 @@ class Webapp_Version_Engine extends Engine
     }
 
     /**
-     * Delete downloaded webapp version.
+     * Deletes downloaded webapp version.
      *
      * @param string $version version
      *

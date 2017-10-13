@@ -223,7 +223,7 @@ class Webapp_Backup_Engine extends Engine
     }
 
     /**
-     * Download action for backup.
+     * Returns full path for given backup file.
      *
      * @param string $file_name backup file name
      *
@@ -246,7 +246,7 @@ class Webapp_Backup_Engine extends Engine
     }
 
     /**
-     * Return list of available backups.
+     * Returns list of available backups.
      *
      * @return array list of available backups
      * @throws Engine_Exception
