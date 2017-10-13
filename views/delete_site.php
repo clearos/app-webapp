@@ -17,17 +17,21 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 $this->lang->load('webapp');
+$this->lang->load('base');
 
 ///////////////////////////////////////////////////////////////////////////////
 // Form
 ///////////////////////////////////////////////////////////////////////////////
 
 echo form_open('/' . $webapp . '/site/delete/' . $site);
-echo form_header(lang('webapp_confirm_delete'));
+echo form_header(lang('base_confirm'));
+echo form_banner(lang('base_are_you_sure_delete') . ' &nbsp; <b>' . $site . '</b>');
 
-echo field_checkbox('database_delete', $database_delete, lang('webapp_delete_database'));
-echo field_input('database_delete_username', $database_admin_username, lang('webapp_database_admin_username'), FALSE, [ 'hide_field' => TRUE ]);
-echo field_password('database_delete_password', $database_admin_password, lang('webapp_database_admin_password'), FALSE, [ 'hide_field' => TRUE ]);
+if ($database) {
+    echo field_checkbox('database_delete', $database_delete, lang('webapp_delete_database'));
+    echo field_input('database_delete_username', $database_admin_username, lang('webapp_database_admin_username'));
+    echo field_password('database_delete_password', $database_admin_password, lang('webapp_database_admin_password'));
+}
 
 echo field_button_set(
     [

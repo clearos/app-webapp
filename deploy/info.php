@@ -29,7 +29,7 @@ $app['menu_enabled'] = FALSE;
 $app['core_requires'] = array(
     'app-base-core >= 1:1.5.24',
     'app-certificate-manager-core',
-    'app-flexshare-core >= 1:2.4.3',
+    'app-flexshare-core >= 1:2.4.5',
     'app-groups-core',
     'app-network-core',
     'app-web-server-core >= 1:2.4.5',

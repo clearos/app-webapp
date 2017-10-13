@@ -117,6 +117,7 @@ class Webapp_Engine extends Engine
      * - password initialization for database server
      *
      * @return array list of issues
+     * @throws Engine_Exception
      */
 
     public function get_dependency_issues()
@@ -148,6 +149,7 @@ class Webapp_Engine extends Engine
      * Returns readiness of underlying stack.
      *
      * @return array array of error messagse if there are issues with the stack
+     * @throws Engine_Exception
      */
 
     public function get_readiness()

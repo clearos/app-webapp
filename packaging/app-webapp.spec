@@ -31,6 +31,7 @@ Requires: app-network-core
 Requires: app-web-server-core >= 1:2.4.5
 Requires: app-mariadb-core
 Requires: openssl
+Requires: wget
 Requires: zip
 
 %description core

@@ -59,18 +59,22 @@ use \clearos\apps\base\Engine as Engine;
 use \clearos\apps\base\File as File;
 use \clearos\apps\base\Folder as Folder;
 use \clearos\apps\base\Shell as Shell;
+use \clearos\apps\webapp\Webapp_Site_Engine as Webapp_Site_Engine;
 
 clearos_load_library('base/Engine');
 clearos_load_library('base/File');
 clearos_load_library('base/Folder');
 clearos_load_library('base/Shell');
+clearos_load_library('webapp/Webapp_Site_Engine');
 
 // Exceptions
 //-----------
 
 use \clearos\apps\base\Engine_Exception as Engine_Exception;
+use \clearos\apps\base\Validation_Exception as Validation_Exception;
 
 clearos_load_library('base/Engine_Exception');
+clearos_load_library('base/Validation_Exception');
 
 ///////////////////////////////////////////////////////////////////////////////
 // C L A S S
@@ -131,7 +135,7 @@ class Webapp_Backup_Engine extends Engine
      * @param string $database_name database name
      * @param string $username      database username
      * @param string $password      database password
-     *:w
+     *
      * @return void
      * @throws Engine_Exception
      */
@@ -140,32 +144,50 @@ class Webapp_Backup_Engine extends Engine
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        /* 
-        FIXME
-        Validation_Exception::is_valid($this->validate_database_name($name));
-        Validation_Exception::is_valid($this->validate_database_username($username));
-        Validation_Exception::is_valid($this->validate_database_password($password));
-        */
+        // Validation
+        //-----------
+
+        $site = new Webapp_Site_Engine($this->webapp);
+
+        Validation_Exception::is_valid($site->validate_database_name($database_name));
+        Validation_Exception::is_valid($site->validate_database_username($username));
+        Validation_Exception::is_valid($site->validate_database_password($password));
+
+        // Backup
+        //-------
 
         $sql_file_path = $this->path . '/' . $database_name . '__' . date('Y-m-d-H-i-s') . '.sql';
 
         $params = " -u'$username' -p'$password' '$database_name' > '$sql_file_path'";
 
         $shell = new Shell();
-        $shell->execute(self::COMMAND_MYSQLDUMP, $params, FALSE, $options);
+        $shell->execute(self::COMMAND_MYSQLDUMP, $params, FALSE);
     }
 
     /**
      * Creates backup of site folder.
      *
-     * @param string $site      site name
-     * @param string $site_root site document root
+     * @param string $site site name
+     *
      * @return void
+     * @throws Engine_Exception
      */
 
-    public function backup_site($site, $site_root)
+    public function backup_site($site)
     {
         clearos_profile(__METHOD__, __LINE__);
+
+        // Validation
+        //-----------
+
+        $site_engine = new Webapp_Site_Engine($this->webapp);
+
+        Validation_Exception::is_valid($site_engine->validate_site($site));
+
+        // Backup site
+        //------------
+
+        $site_root = $site_engine->get_site_root($site);
 
         $zip_path = $this->path . '/' . $site . '__' . date('Y-m-d-H-i-s') . '.zip';
         $params = "-r $zip_path $site_root";
@@ -242,15 +264,6 @@ class Webapp_Backup_Engine extends Engine
 
         return $list;
     }
-
-    ///////////////////////////////////////////////////////////////////////////
-    // V A L I D A T I O N   R O U T I N E S                                 //
-    ///////////////////////////////////////////////////////////////////////////
-
-
-    ///////////////////////////////////////////////////////////////////////////////
-    // P R I V A T E  M E T H O D S
-    ///////////////////////////////////////////////////////////////////////////////
 }
 
 // vim: syntax=php ts=4

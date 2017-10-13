@@ -135,16 +135,25 @@ class Webapp_Site_Engine extends Engine
      *
      * @param string $username database username
      * @param string $password database password
-     * @param string $site     site name
+     * @param string $database database name
      *
      * @return string error message if unable to connect with database
+     * @throws Engine_Exception
      */
 
-    public function check_existing_database($username, $password, $site)
+    public function check_existing_database($username, $password, $database)
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        $database = $this->get_database_name($site);
+        // Validation
+        //-----------
+
+        Validation_Exception::is_valid($this->validate_database_username($username));
+        Validation_Exception::is_valid($this->validate_database_password($password));
+        Validation_Exception::is_valid($this->validate_database_name($database));
+
+        // Check
+        //------
 
         return $this->_check_database($username, $password, $database, FALSE);
     }
@@ -157,13 +166,54 @@ class Webapp_Site_Engine extends Engine
      * @param string $database database name
      *
      * @return string error message if unable to connect with database
+     * @throws Engine_Exception
      */
 
     public function check_new_database($username, $password, $database)
     {
         clearos_profile(__METHOD__, __LINE__);
 
+        // Validation
+        //-----------
+
+        Validation_Exception::is_valid($this->validate_database_username($username));
+        Validation_Exception::is_valid($this->validate_database_password($password));
+        Validation_Exception::is_valid($this->validate_database_name($database));
+
+        // Check
+        //------
+
         return $this->_check_database($username, $password, $database, TRUE);
+    }
+
+    /**
+     * Checks for connectivity issues with existing site database.
+     *
+     * @param string $username database username
+     * @param string $password database password
+     * @param string $site     site name
+     *
+     * @return string error message if unable to connect with database
+     * @throws Engine_Exception
+     */
+
+    public function check_site_database($username, $password, $site)
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        // Validation
+        //-----------
+
+        Validation_Exception::is_valid($this->validate_database_username($username));
+        Validation_Exception::is_valid($this->validate_database_password($password));
+        Validation_Exception::is_valid($this->validate_site($site));
+
+        // Check
+        //------
+
+        $database = $this->get_database_name($site);
+
+        return $this->_check_database($username, $password, $database, FALSE);
     }
 
     /**
@@ -173,6 +223,7 @@ class Webapp_Site_Engine extends Engine
      * @param boolean $do_backup set to TRUE for creating backup
      *
      * @return void
+     * @throws Engine_Exception
      */
 
     public function delete($site, $do_backup)
@@ -183,6 +234,7 @@ class Webapp_Site_Engine extends Engine
         //-----------
 
         Validation_Exception::is_valid($this->validate_site($site));
+        Validation_Exception::is_valid($this->validate_boolean($do_backup));
 
         // Run backup if requested
         //------------------------
@@ -191,7 +243,7 @@ class Webapp_Site_Engine extends Engine
             $site_root = $this->get_site_root($site);
 
             $backup = new Webapp_Backup_Engine($this->webapp); 
-            $backup->backup_site($site, $site_root);
+            $backup->backup_site($site);
         }
 
         // Delete web site via Httpd API
@@ -210,15 +262,23 @@ class Webapp_Site_Engine extends Engine
      * @param boolean $do_backup flag to indicate backup
      *
      * @return void
+     * @throws Engine_Exception
      */
 
     public function delete_database($site, $username, $password, $do_backup)
     {
         clearos_profile(__METHOD__, __LINE__);
 
+        // Validation
+        //-----------
+
         Validation_Exception::is_valid($this->validate_site($site));
         Validation_Exception::is_valid($this->validate_database_username($username));
         Validation_Exception::is_valid($this->validate_database_password($password));
+        Validation_Exception::is_valid($this->validate_boolean($do_backup));
+
+        // Delete
+        //-------
 
         $database_name = $this->get_database_name($site);
 
@@ -233,6 +293,36 @@ class Webapp_Site_Engine extends Engine
         $retval = $shell->execute(self::COMMAND_MYSQL, $params, FALSE);
     }
 
+    /**
+     * Returns web aliases.
+     *
+     * @param string $site site
+     *
+     * @return string web aliases
+     * @throws Engine_Exception
+     */
+
+    public function get_aliases($site)
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        // Validation
+        //-----------
+
+        Validation_Exception::is_valid($this->validate_site($site));
+
+        // Get aliases
+        //------------
+
+        $httpd = new Httpd();
+
+        return $httpd->get_aliases($site);
+    }
+
+    /**
+     * Returns a list of valid web certificates for site.
+     *
+     * @return array list of available certificates
     /**
      * Returns document root.
      *
@@ -275,6 +365,14 @@ class Webapp_Site_Engine extends Engine
     {
         clearos_profile(__METHOD__, __LINE__);
 
+        // Validation
+        //-----------
+
+        Validation_Exception::is_valid($this->validate_site($site));
+
+        // Get file state
+        //---------------
+
         $httpd = new Httpd();
 
         return $httpd->get_file_state($site);
@@ -293,6 +391,14 @@ class Webapp_Site_Engine extends Engine
     {
         clearos_profile(__METHOD__, __LINE__);
 
+        // Validation
+        //-----------
+
+        Validation_Exception::is_valid($this->validate_site($site));
+
+        // Get FTP state
+        //--------------
+
         $httpd = new Httpd();
 
         return $httpd->get_ftp_state($site);
@@ -310,6 +416,14 @@ class Webapp_Site_Engine extends Engine
     public function get_group($site)
     {
         clearos_profile(__METHOD__, __LINE__);
+
+        // Validation
+        //-----------
+
+        Validation_Exception::is_valid($this->validate_site($site));
+
+        // Get group
+        //----------
 
         $httpd = new Httpd();
 
@@ -341,7 +455,8 @@ class Webapp_Site_Engine extends Engine
     /**
      * Returns list of sites.
      *
-     * @return array $list of all sites for given webapp
+     * @return array list of all sites for given webapp
+     * @throws Engine_Exception
      */
 
     public function get_sites()
@@ -349,15 +464,12 @@ class Webapp_Site_Engine extends Engine
         clearos_profile(__METHOD__, __LINE__);
 
         $httpd = new Httpd();
-        $webapps = $httpd->get_webapps();
+        $webapps = $httpd->get_webapps($this->webapp);
 
         $list = array();
 
-        foreach ($webapps as $key => $value) {
+        foreach ($webapps as $key => $value)
             $list[$key]['name'] = $key;
-            // $list[$key]['database'] = $this->get_database_name($key);
-            // FIXME
-        }
 
         return $list;
     }
@@ -374,6 +486,14 @@ class Webapp_Site_Engine extends Engine
     public function get_site_root($site)
     {
         clearos_profile(__METHOD__, __LINE__);
+
+        // Validation
+        //-----------
+
+        Validation_Exception::is_valid($this->validate_site($site));
+
+        // Get site root
+        //--------------
 
         $httpd = new Httpd();
 
@@ -393,16 +513,23 @@ class Webapp_Site_Engine extends Engine
     {
         clearos_profile(__METHOD__, __LINE__);
 
+        // Validation
+        //-----------
+
+        Validation_Exception::is_valid($this->validate_site($site));
+
+        // Get SSL certificate
+        //--------------------
+
         $httpd = new Httpd();
 
         return $httpd->get_ssl_certificate($site);
-
     }
 
     /**
      * Returns a list of valid web certificates for site.
      *
-     * @return string array list of available certificates
+     * @return array list of available certificates
      * @throws Engine_Exception
      */
 
@@ -425,8 +552,8 @@ class Webapp_Site_Engine extends Engine
      * @param string $file_state  file enabled state
      * @param string $certificate SSL certificate
      *
-     * @return  void
-     * @throws  Engine_Exception
+     * @return void
+     * @throws Engine_Exception
      */
 
     public function update($site, $aliases, $group, $ftp_state, $file_state, $certificate)
@@ -474,14 +601,14 @@ class Webapp_Site_Engine extends Engine
     }
 
     /**
-     * Validate database delete flag.
+     * Validation routine for booleans.
      *
-     * @param boolean $flag database delete flag
+     * @param boolean $flag flag
      *
-     * @return string error message if delete flag is invalid
+     * @return string error message if flag is invalid
      */
 
-    public function validate_database_delete_flag($flag)
+    public function validate_boolean($flag)
     {
         clearos_profile(__METHOD__, __LINE__);
 
@@ -490,7 +617,7 @@ class Webapp_Site_Engine extends Engine
     }
 
     /**
-     * Validate database name.
+     * Validation routine for database name.
      *
      * @param string $name database name
      *
@@ -506,7 +633,7 @@ class Webapp_Site_Engine extends Engine
     }
 
     /**
-     * Validate database password.
+     * Validation routine for database password.
      *
      * @param string $password password
      *
@@ -522,7 +649,7 @@ class Webapp_Site_Engine extends Engine
     }
 
     /**
-     * Validate database username.
+     * Validation routine for database username.
      *
      * @param string $username Username
      *
@@ -596,13 +723,13 @@ class Webapp_Site_Engine extends Engine
      * @return string error message if site is invalid
      */
 
-    public function validate_site($site)
+    public function validate_site($site, $check_exists = FALSE)
     {
         clearos_profile(__METHOD__, __LINE__);
 
         $httpd = new Httpd();
 
-        return $httpd->validate_site($site);
+        return $httpd->validate_site($site, $check_exists);
     }
 
     /**
@@ -635,14 +762,23 @@ class Webapp_Site_Engine extends Engine
      * @param boolean $is_new   flag to indicate new database
      *
      * @return string error message if unable to connect with database
+     * @throws Engine_Exception
      */
 
     protected function _check_database($username, $password, $database, $is_new)
     {
         clearos_profile(__METHOD__, __LINE__);
 
+        // Validation
+        //-----------
+
         Validation_Exception::is_valid($this->validate_database_username($username));
         Validation_Exception::is_valid($this->validate_database_password($password));
+        Validation_Exception::is_valid($this->validate_database_name($database));
+        Validation_Exception::is_valid($this->validate_boolean($is_new));
+
+        // Check
+        //------
 
         $params = "-u'$username' -p'$password' -e \"SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '$database'\"";
         $shell = new Shell();

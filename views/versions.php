@@ -38,16 +38,15 @@ $buttons  = array();
 
 $items = array();
 
-foreach ($versions as $value) {
-    if ($value['clearos_path']) {
-        $button = anchor_delete('/app/' . $webapp . '/version/delete/' . $value['file_name']);
-    } else {
-        $button = anchor_custom('/app/' . $webapp . '/version/download/' . $value['file_name'], lang('base_download'));
-    }
+foreach ($versions as $version => $details) {
+    if ($details['local_path'])
+        $button = anchor_delete('/app/' . $webapp . '/version/delete/' . $version);
+    else
+        $button = anchor_custom('/app/' . $webapp . '/version/download/' . $version, lang('base_download'));
 
     $item['anchors'] = button_set(array($button));
     $item['details'] = array(
-        $webapp_description . ' ' . $value['version'],
+        $webapp_description . ' ' . $version,
     );
 
     $items[] = $item;

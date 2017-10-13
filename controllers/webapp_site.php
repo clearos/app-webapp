@@ -154,7 +154,7 @@ class Webapp_Site extends ClearOS_Controller
 
         $delete_database = ($this->input->post('database_delete')) ? $this->input->post('database_delete') : FALSE;
 
-        $this->form_validation->set_policy('database_delete', $this->site_driver, 'validate_database_delete_flag');
+        $this->form_validation->set_policy('database_delete', $this->site_driver, 'validate_boolean');
 
         if ($delete_database) {
             $this->form_validation->set_policy('database_delete_username', $this->site_driver, 'validate_database_username', TRUE);
@@ -167,7 +167,7 @@ class Webapp_Site extends ClearOS_Controller
         //-----------------
 
         if ($this->input->post('submit') && $form_ok && $delete_database) {
-            $database_problem = $this->webapp_site_driver->check_existing_database(
+            $database_problem = $this->webapp_site_driver->check_site_database(
                 $this->input->post('database_delete_username'),
                 $this->input->post('database_delete_password'),
                 $site
@@ -203,8 +203,14 @@ class Webapp_Site extends ClearOS_Controller
         // Load the view data 
         //------------------- 
 
-        $data['webapp'] = $this->app_basename;
-        $data['site'] = $site;
+        try {
+            $data['site'] = $site;
+            $data['webapp'] = $this->app_basename;
+            $data['database'] = $this->webapp_site_driver->get_database_name($site);
+        } catch (Exception $e) {
+            $this->page->view_exception($e);
+            return;
+        }
 
         // Load the view
         //--------------
@@ -241,7 +247,8 @@ class Webapp_Site extends ClearOS_Controller
         //---------------------
 
         if ($form_type == 'add') {
-            $use_existing_database = $this->input->post('use_existing_database');
+            $use_existing_database_input = $this->input->post('use_existing_database');
+            $use_existing_database = ($use_existing_database_input == 'Yes') ? TRUE : FALSE;
 
             $this->form_validation->set_policy('database_name', $this->site_driver, 'validate_database_name', TRUE);
             $this->form_validation->set_policy('database_username', $this->site_driver, 'validate_database_username', TRUE);
@@ -251,7 +258,7 @@ class Webapp_Site extends ClearOS_Controller
             $this->form_validation->set_policy('webapp_version', $this->version_driver, 'validate_version', TRUE);
         }
 
-        $check_exists = ($form_type === 'add') ? TRUE : FALSE; // FIXME - enable this
+        $check_exists = ($form_type === 'add') ? TRUE : FALSE;
 
         $this->form_validation->set_policy('site', $this->site_driver, 'validate_site', TRUE, $check_exists);
         $this->form_validation->set_policy('aliases', $this->site_driver, 'validate_aliases');
@@ -278,12 +285,20 @@ class Webapp_Site extends ClearOS_Controller
             }
 
             // Check existing database connectivity
-            if ($form_type == 'add') {
-                $database_problem = $this->webapp_site_driver->check_new_database(
-                    $this->input->post('database_admin_username'),
-                    $this->input->post('database_admin_password'),
-                    $this->input->post('database_name')
-                );
+            if (($form_type == 'add') && $form_ok) {
+                if ($use_existing_database) {
+                    $database_problem = $this->webapp_site_driver->check_existing_database(
+                        $this->input->post('database_admin_username'),
+                        $this->input->post('database_admin_password'),
+                        $this->input->post('database_name')
+                    );
+                } else {
+                    $database_problem = $this->webapp_site_driver->check_new_database(
+                        $this->input->post('database_admin_username'),
+                        $this->input->post('database_admin_password'),
+                        $this->input->post('database_name')
+                    );
+                }
                 if ($database_problem) {
                     $this->form_validation->set_error('database_admin_password', $database_problem);
                     $form_ok = FALSE;
@@ -343,35 +358,30 @@ class Webapp_Site extends ClearOS_Controller
         //------------------- 
 
         try {
-            $version_all = $this->webapp_version_driver->listing(TRUE);
-            $versions = array();
+            $downloaded_versions = $this->webapp_version_driver->listing(TRUE);
 
-            foreach ($version_all as $key => $value) {
-                if ($value['clearos_path'])
-                    $versions[$value['file_name']] = $value['version'];
-            }
+            foreach ($downloaded_versions as $version => $details)
+                $data['versions'][$version] = $this->app_description . ' ' . $version;
 
             $data['form_type'] = $form_type;
             $data['webapp'] = $this->app_basename;
             $data['site'] = $site;
-            $data['versions'] = $versions;
-            $data['default_version'] = 'latest.zip';
             $data['ftp_available'] = clearos_app_installed('ftp');
             $data['file_available'] = clearos_app_installed('samba');
 
-            $data['groups'] = $this->webapp_site_driver->get_group_options($iste);
+            $data['groups'] = $this->webapp_site_driver->get_group_options($site);
             $data['ssl_certificate_options'] = $this->webapp_site_driver->get_ssl_certificate_options();
 
             if ($form_type == 'add') {
                 $data['ftp_enabled'] = TRUE;
                 $data['file_enabled'] = TRUE;
             } else {
+                $data['aliases'] = $this->webapp_site_driver->get_aliases($site);
                 $data['ftp_enabled'] = $this->webapp_site_driver->get_ftp_state($site);
                 $data['file_enabled'] = $this->webapp_site_driver->get_file_state($site);
                 $data['ssl_certificate'] = $this->webapp_site_driver->get_ssl_certificate($site);
                 $data['group'] = $this->webapp_site_driver->get_group($site);
             }
-
         } catch (Exception $e) {
             $this->page->view_exception($e);
             return;

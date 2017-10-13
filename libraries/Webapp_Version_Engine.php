@@ -63,6 +63,13 @@ clearos_load_library('base/Engine');
 clearos_load_library('base/File');
 clearos_load_library('base/Shell');
 
+// Exceptions
+//-----------
+
+use \clearos\apps\base\Validation_Exception as Validation_Exception;
+
+clearos_load_library('base/Validation_Exception');
+
 ///////////////////////////////////////////////////////////////////////////////
 // C L A S S
 ///////////////////////////////////////////////////////////////////////////////
@@ -120,63 +127,72 @@ class Webapp_Version_Engine extends Engine
     /**
      * Delete downloaded webapp version.
      *
-     * @param string $file_name file name
+     * @param string $version version
      *
-     * @return TRUE if delete completed
+     * @return void
      * @throws Engine_Exception
      */
 
-    public function delete($file_name)
+    public function delete($version)
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        $path_file = $this->path . '/' . $file_name;
+        // Validation
+        //-----------
+
+        Validation_Exception::is_valid($this->validate_version($version, FALSE));
+
+        // Delete
+        //-------
+
+        $versions = $this->listing();
+        $path_file = $versions[$version]['local_path'];
 
         $file = new File($path_file, TRUE);
 
-        if (!$file->exists())
-           return FALSE;
-
         $file->delete();
-
-        return TRUE;
     }
 
     /**
-     * Downloads webapp install file from given location.
+     * Downloads webapp install file.
      *
-     * @param string $file_name version file name
+     * @param string $version version
      *
-     * @return TRUE if download completed
+     * @return void
      * @throws Engine_Exception
      */
 
-    public function download($file_name)
+    public function download($version)
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        $path_file = $this->path . '/' . $file_name;
-        $file = new File($path_file, TRUE);
+        // Validation
+        //-----------
 
-        if ($file->exists())
-           return;
+        Validation_Exception::is_valid($this->validate_version($version, FALSE));
+
+        // Check existence
+        //----------------
 
         $versions = $this->listing();
-        $download_url = '';
 
-        foreach ($versions as $key => $value) {
-            if ($value['file_name'] == $file_name) {
-                $download_url = $value['download_url'];
-                break;
-            }
+        $path_file = $versions[$version]['local_path'];
+
+        if (!empty($path_file)) {
+            $file = new File($path_file, TRUE);
+
+            if ($file->exists())
+               return;
         }
+
+        // Download
+        //---------
+
+        $download_url = $versions[$version]['download_url'];
 
         $shell = new Shell();
         $params = "'$download_url' -P '$this->path'";
-
-        $retval = $shell->execute(self::COMMAND_WGET, $params, FALSE);
-
-        return TRUE;
+        $shell->execute(self::COMMAND_WGET, $params, FALSE);
     }
 
     /**
@@ -191,15 +207,22 @@ class Webapp_Version_Engine extends Engine
     {
         clearos_profile(__METHOD__, __LINE__);
 
+        // Validation
+        //-----------
+
+        Validation_Exception::is_valid($this->validate_boolean($only_downloaded));
+
+        // Listing
+        //--------
+
         $versions = $this->versions;
 
-        foreach ($this->versions as $key => $value) {
-            $versions[$key]['file_name'] = basename($versions[$key]['download_url']);
-            $versions[$key]['clearos_path'] = $this->_get_version_downloaded_path(basename($versions[$key]['download_url']));
+        foreach ($this->versions as $version => $details) {
+            $versions[$version]['local_path'] = $this->_get_local_path($details['download_url']);
 
             if ($only_downloaded) {
-                if (!$versions[$key]['clearos_path'])
-                    unset($versions[$key]);
+                if (!$versions[$version]['local_path'])
+                    unset($versions[$version]);
             }
         }
 
@@ -209,6 +232,22 @@ class Webapp_Version_Engine extends Engine
     ///////////////////////////////////////////////////////////////////////////
     // V A L I D A T I O N   R O U T I N E S                                 //
     ///////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Validation routine for booleans.
+     *
+     * @param boolean $flag flag
+     *
+     * @return string error message if flag is invalid
+     */
+
+    public function validate_boolean($flag)
+    {
+        clearos_profile(__METHOD__, __LINE__);
+
+        if (! clearos_is_valid_boolean($flag))
+            return lang('base_parameter_invalid');
+    }
 
     /**
      * Validation routine for version.
@@ -225,16 +264,11 @@ class Webapp_Version_Engine extends Engine
 
         $versions = $this->listing();
 
-        foreach ($versions as $details) {
-            if ($details['version'] == $version) {
-                if ($only_downloaded && empty($details['clearos_path']))
-                    return lang('webapp_version_invalid');
-                else
-                    return;
-            }
-        }
+        if (!array_key_exists($version, $versions))
+            return lang('webapp_version_invalid');
 
-        return lang('webapp_version_invalid');
+        if ($only_downloaded && empty($versions[$version]['local_path']))
+            return lang('webapp_version_invalid');
     }
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -242,40 +276,27 @@ class Webapp_Version_Engine extends Engine
     ///////////////////////////////////////////////////////////////////////////////
 
     /**
-     * Returns local system download path.
+     * Returns local system download path for given URL.
      * 
-     * @param @string $version_name version name 
+     * @param string $download_url download URL
      *
-     * @return @string path to downloaded version file if available
+     * @return string local filename
      * @throws Engine_Exception
      */
 
-    protected function _get_version_downloaded_path($version_name)
+    protected function _get_local_path($download_url)
     {
         clearos_profile(__METHOD__, __LINE__);
 
-        $filename = $this->path . '/' . $version_name;
+        $basename = basename($download_url);
+
+        $filename = $this->path . '/' . $basename;
         $file = new File($filename, TRUE);
 
         if ($file->exists())
             return $filename;
 
         return FALSE;
-    }
-
-    /**
-     * Return update version data.
-     * 
-     * @param array $versions base version array
-     *
-     * @return array updated version array
-     * @throws Engine_Exception
-     */
-
-    protected function _update_version_data($versions)
-    {
-        clearos_profile(__METHOD__, __LINE__);
-
     }
 }
 

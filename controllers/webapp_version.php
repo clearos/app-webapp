@@ -100,14 +100,14 @@ class Webapp_Version extends ClearOS_Controller
     }
 
     /**
-     * Download version file on local system.
+     * Download version to local system.
      *
-     * @param string $file_name file name
+     * @param string $version version
      *
      * @return redirect to index after download 
      */ 
 
-    function download($file_name)
+    function download($version)
     {
         // Load dependencies
         //------------------
@@ -119,7 +119,7 @@ class Webapp_Version extends ClearOS_Controller
         //---------------
 
         try {
-            $this->webapp_version_driver->download($file_name);
+            $this->webapp_version_driver->download($version);
         } catch (Exception $e) {
             $this->page->view_exception($e);
             return;
@@ -136,28 +136,29 @@ class Webapp_Version extends ClearOS_Controller
     /**
      * Delete version view.
      *
-     * @param string $file_name file name
+     * @param string $version version
      *
      * @return view
      */
 
-    function delete($file_name)
+    function delete($version)
     {
-        $confirm_uri = '/app/' . $this->app_basename . '/version/destroy/' . $file_name;
+        $confirm_uri = '/app/' . $this->app_basename . '/version/destroy/' . $version;
         $cancel_uri = '/app/' . $this->app_basename;
-        $items = array($file_name);
+        $items = array($this->app_description . ' ' . $version);
 
         $this->page->view_confirm_delete($confirm_uri, $cancel_uri, $items);
     }
 
     /**
-     * Delete Version file on local system
+     * Destroys version.
      *
-     * @param string $file_name File Name 
-     * @return redirect to index after delete 
+     * @param string $version version
+     *
+     * @return redirect
      */ 
 
-    function destroy($file_name)
+    function destroy($version)
     {
         // Load dependencies
         //------------------
@@ -169,7 +170,7 @@ class Webapp_Version extends ClearOS_Controller
         //---------------
 
         try {
-            $this->webapp_version_driver->delete($file_name);
+            $this->webapp_version_driver->delete($version);
 
             $this->page->set_status_deleted();
             redirect('/' . $this->app_basename . '/version');
